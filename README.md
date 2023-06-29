@@ -1,2 +1,2 @@
 # haplot
-A series of python scripts were used for haplotype visual analysis
+A series of python scripts were used for omics visual analysis
