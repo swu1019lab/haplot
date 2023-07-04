@@ -2,16 +2,29 @@
 # @Time    : 2023/6/27 16:38
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
-# @File    : stats.py
+# @File    : chart.py
 
 from itertools import cycle
 import numpy as np
 import pandas as pd
+from scipy import stats
 from matplotlib import axes
 import matplotlib.pyplot as plt
 
 
 def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
+    """
+    Boxplot
+
+    a helpful function to plot boxplot
+
+    Parameters
+    ----------
+    :param df: a DataFrame object to plot
+    :param by: 'column' or 'index'
+    :param ax: a matplotlib.axes.Axes object
+    :return: a matplotlib.axes.Axes object
+    """
     if ax is None:
         ax = plt.gca()
 
@@ -59,8 +72,7 @@ def ManhattanPlot(
         threshold0: float = None,
         threshold1: float = None,
         style: str = 'line',
-        ax: axes.Axes = None
-):
+        ax: axes.Axes = None):
     """
     Manhattan plot
 
@@ -130,4 +142,25 @@ def ManhattanPlot(
     ax.set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
     ax.tick_params(axis='x', rotation=45)
 
+    return ax
+
+
+def QQPlot(
+        df: pd.DataFrame,
+        p_value_col: int = 2,
+        ax: axes.Axes = None):
+    if ax is None:
+        ax = plt.gca()
+
+    p = df.iloc[:, p_value_col]
+    # return two tuple: (osm, osr), (slope, intercept, r)
+    # 1st tuple contains two arrays:
+    # first is theoretical quantiles, second is sample quantiles
+    res = stats.probplot(p, dist=stats.uniform)
+    osm, osr = res[0]
+    ax.scatter(-np.log10(osm), -np.log10(osr))
+    # slope, intercept, r = res[1]
+    reg = stats.linregress(-np.log10(osm), -np.log10(osr))
+    ax.plot(-np.log10(osm), -np.log10(osm) * reg[0] + reg[1], 'r-')
+    ax.text(0.05, 0.95, f"R^2 = {reg[2] ** 2:.3f}", transform=ax.transAxes)
     return ax

@@ -20,7 +20,7 @@ class Theme(object):
         return self.apply(*args, **kwargs)
 
     @staticmethod
-    def apply(ax: axes.Axes):
+    def apply(ax: axes.Axes = None):
         if ax is None:
             ax = plt.gca()
 

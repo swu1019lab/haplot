@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from haplot.theme import BoxTheme
-from haplot.stats import boxplot
+from haplot.chart import boxplot
 
 
 np.random.seed(19680801)
