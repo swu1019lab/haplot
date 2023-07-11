@@ -117,6 +117,29 @@ class BoxTheme(object):
         return ax
 
 
+class ManhattanTheme(object):
+    def __str__(self):
+        return "ManhattanTheme"
+
+    __repr__ = __str__
+
+    def __call__(self, *args, **kwargs):
+        return self.apply(*args, **kwargs)
+
+    @staticmethod
+    def apply(ax: axes.Axes = None):
+        if ax is None:
+            ax = plt.gca()
+
+        ax.set_xlabel("Chromosome")
+        ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
+
+        ax.set_ylim(bottom=0, top=None)
+        ax.tick_params(axis='x', rotation=0)
+
+        return ax
+
+
 class BarTheme(object):
     def __init__(self):
         return

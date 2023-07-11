@@ -14,6 +14,7 @@ from haplot.theme import Theme
 
 np.random.seed(123)
 df = generate_data(sort=True)
+fig, ax = plt.subplots(figsize=(5, 5))
 QQPlot(df, 2)
 Theme.apply()
 plt.show()

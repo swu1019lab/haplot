@@ -7,7 +7,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from haplot.chart import ManhattanPlot
-from haplot.theme import Theme
+from haplot.theme import ManhattanTheme
 from haplot.data import generate_data
 
 
@@ -15,7 +15,7 @@ from haplot.data import generate_data
 df = generate_data(sort=True)
 
 np.random.seed(123)
-fig, ax = plt.subplots(figsize=(10, 5))
-ManhattanPlot(df)
-Theme.apply(ax)
+fig, ax = plt.subplots(figsize=(5, 5))
+ManhattanPlot(df, value_col=[2, 3])
+ManhattanTheme.apply(ax)
 plt.show()
