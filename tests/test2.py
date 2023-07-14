@@ -9,12 +9,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from haplot.data import generate_data
 from haplot.chart import QQPlot
-from haplot.theme import Theme
+from haplot.theme import QQTheme
 
 
 np.random.seed(123)
 df = generate_data(sort=True)
 fig, ax = plt.subplots(figsize=(5, 5))
 QQPlot(df, 2)
-Theme.apply()
+QQTheme.apply()
 plt.show()

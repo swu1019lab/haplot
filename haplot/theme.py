@@ -5,7 +5,7 @@
 # @File    : theme.py
 
 
-from matplotlib import axes
+from matplotlib import figure, axes
 import matplotlib.pyplot as plt
 from itertools import cycle
 
@@ -127,24 +127,39 @@ class ManhattanTheme(object):
         return self.apply(*args, **kwargs)
 
     @staticmethod
+    def apply(fig: figure.Figure = None):
+        if fig is None:
+            fig = plt.gcf()
+
+        if len(fig.axes) == 0:
+            print("No axes in figure.")
+            return fig
+        else:
+            for ax in fig.axes:
+                Theme.apply(ax)
+                ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
+                ax.set_xmargin(0.01)
+                ax.set_ylim(bottom=0, top=None)
+            fig.axes[-1].set_xlabel("Chromosome")
+            fig.axes[-1].tick_params(axis='x', rotation=0)
+        return fig
+
+
+class QQTheme(object):
+    def __str__(self):
+        return "QQTheme"
+
+    __repr__ = __str__
+
+    def __call__(self, *args, **kwargs):
+        return self.apply(*args, **kwargs)
+
+    @staticmethod
     def apply(ax: axes.Axes = None):
         if ax is None:
             ax = plt.gca()
-
-        ax.set_xlabel("Chromosome")
-        ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
-
-        ax.set_ylim(bottom=0, top=None)
-        ax.tick_params(axis='x', rotation=0)
-
+        Theme.apply(ax)
+        ax.set_xlabel("Expected -log10(p-value)")
+        ax.set_ylabel("Observed -log10(p-value)")
         return ax
 
-
-class BarTheme(object):
-    def __init__(self):
-        return
-
-
-class LineTheme(object):
-    def __init__(self):
-        return

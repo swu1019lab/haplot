@@ -8,7 +8,11 @@ from itertools import cycle
 import numpy as np
 import pandas as pd
 from scipy import stats
-from matplotlib import axes
+import matplotlib as mpl
+from matplotlib import figure, axes
+from matplotlib.patches import RegularPolygon
+from matplotlib.collections import PatchCollection
+from matplotlib.text import OffsetFrom
 import matplotlib.pyplot as plt
 
 
@@ -69,29 +73,36 @@ def ManhattanPlot(
         chr_col: int = 0,
         pos_col: int = 1,
         value_col: int | list = 2,
+        ann_col: int = None,
         threshold0: float = None,
         threshold1: float = None,
         chr_names: list | str = None,
+        colors: list = None,
         style: str = 'line',
-        ax: axes.Axes = None):
+        fig: figure.Figure = None):
     """
     Manhattan plot
 
-    The Manhattan plot is a type of scatter plot, usually used to display data
-    with a large number of data-points
+    Features
+    ----------
+    Support line and scatter style \n
+    Support multiple value columns \n
+    Support multiple or selected chromosomes \n
 
     Parameters
     ----------
     :param df: dataframe with columns of chromosome, position and p-value at least
     :param chr_col: column index of chromosome
     :param pos_col: column index of position
-    :param value_col: column index of value, or list of column index of value
+    :param value_col: column index of value or list of column index of value
+    :param ann_col: column index of annotation
     :param threshold0: threshold for significant p-value
     :param threshold1: threshold for extremely significant p-value
     :param chr_names: list of chromosome names selected to plot
+    :param colors: list of colors for each chromosome
     :param style: {'line', 'scatter'}, default 'line', style of plot
-    :param ax: matplotlib axes object
-    :return: matplotlib axes object
+    :param fig: matplotlib figure object
+    :return: matplotlib figure object
     """
     # filter data
     if chr_names is not None:
@@ -106,97 +117,161 @@ def ManhattanPlot(
     xdata = xdata.transform(lambda x: x * 1e-6)
 
     # transform ydata
+    if isinstance(value_col, int):
+        value_col = [value_col]
     ydata = df.iloc[:, value_col]
     ydata = -np.log10(ydata.to_numpy())
 
-    # chromosome colors, length and center loci
-    prop_cycle = plt.rcParams['axes.prop_cycle']
-    colors = cycle(prop_cycle.by_key()['color'])
+    # transform annotation
+    if ann_col is not None:
+        # drop empty rows if values are NA in all annotation columns
+        ann_data = df.iloc[:, ann_col].dropna(how='all')
+    else:
+        ann_data = None
+
+    # set colors for each chromosome
+    if colors is None:
+        colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+    else:
+        colors = cycle(colors)
     cdata = xdata.groupby(level=0, group_keys=False).apply(lambda x: x.assign(colors=next(colors))).iloc[:, -1]
+    # calculate chromosome length
     chr_len = xdata.groupby(level=0).max()
     # add gap between chromosomes
     chr_len_new = chr_len.transform(lambda x: x + x.sum() / 100)
+    # calculate chromosome center location
     chr_start = chr_len_new.cumsum() - chr_len_new
     chr_center = chr_start + chr_len_new / 2
 
     # transform x loci based on cum sum of chromosome length
     xdata_new = pd.concat([group + chr_start.loc[name] for name, group in xdata.groupby(level=0)])
 
-    # plot
-    if ax is None:
-        ax = plt.gca()
+    # get figure object
+    if fig is None:
+        fig = plt.gcf()
 
-    if style == 'line':
-        ax.vlines(xdata_new.to_numpy().flatten(), 0, ydata, color=cdata, linewidth=0.5)
-    elif style == 'scatter':
-        ax.scatter(xdata_new.to_numpy().flatten(), ydata, s=1, c=cdata)
-    else:
-        raise ValueError('style must be "line", "scatter"')
+    # create GridSpec object
+    gs = fig.add_gridspec(len(value_col), 1)
+    # add plot
+    for i in range(len(value_col)):
+        ax = fig.add_subplot(gs[i, 0])
+        ax.set_title(df.columns[value_col[i]])
 
-    if threshold0 is not None:
-        ax.axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
-    if threshold1 is not None:
-        ax.axhline(-np.log10(threshold1), color='gray', linewidth=0.5)
+        if style == 'scatter':
+            ax.scatter(xdata_new.to_numpy().flatten(), ydata[:, i], color=cdata, s=0.5)
+        elif style == 'line':
+            ax.vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=cdata, linewidth=0.5)
+        else:
+            raise ValueError('style must be "line" or "scatter"')
 
-    ax.set_xlim(left=-1, right=np.max(xdata_new.values))
-    ax.set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
+        if i != len(value_col) - 1:
+            ax.set_xticks([])
+        else:
+            ax.set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
 
-    return ax
+        if threshold0 is not None:
+            ax.axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
+        if threshold1 is not None:
+            ax.axhline(-np.log10(threshold1), color='gray', linewidth=0.5)
+
+        # add annotation
+        if ann_data is not None:
+            ann_index = ann_data.index.to_numpy()
+            ann_x = xdata_new.iloc[ann_index, :].to_numpy().flatten()
+            ann_y = ydata[ann_index, i]
+            # add an annotation for each point
+            for xi, yi, text in zip(ann_x, ann_y, ann_data.to_numpy()):
+                ax.annotate(
+                    text,
+                    xy=(xi, yi), xycoords='data',
+                    xytext=(30, 10), textcoords='offset points',
+                    ha='left', va='top',
+                    bbox=dict(boxstyle="round", fc="w"),
+                    arrowprops=dict(arrowstyle="->", fc="C0", ec="C0", lw=0.5)
+                )
+    return fig
 
 
 def QQPlot(
         df: pd.DataFrame,
-        p_value_col: int = 2,
+        value_col: int = 2,
         ax: axes.Axes = None):
+    """
+    QQ plot
+
+    Parameters
+    ----------
+    :param df: dataframe with p-value column at least
+    :param value_col: column index of value
+    :param ax: matplotlib axes object
+    :return: matplotlib axes object
+    """
     if ax is None:
         ax = plt.gca()
 
-    p = df.iloc[:, p_value_col]
+    p = df.iloc[:, value_col]
     # return two tuple: (osm, osr), (slope, intercept, r)
     # 1st tuple contains two arrays:
     # first is theoretical quantiles, second is sample quantiles
     res = stats.probplot(p, dist=stats.uniform)
     osm, osr = res[0]
-    ax.scatter(-np.log10(osm), -np.log10(osr))
+    ax.scatter(-np.log10(osm), -np.log10(osr), c='k', s=5)
     # slope, intercept, r = res[1]
     reg = stats.linregress(-np.log10(osm), -np.log10(osr))
-    ax.plot(-np.log10(osm), -np.log10(osm) * reg[0] + reg[1], 'r--')
-    ax.text(0.05, 0.95, f"R^2 = {reg[2] ** 2:.3f}", transform=ax.transAxes)
+    ax.plot(-np.log10(osm), -np.log10(osm) * reg[0] + reg[1], 'b--')
+    # calculate confidence interval for linear regression
+    x = -np.log10(osm)
+    y = -np.log10(osm) * reg[0] + reg[1]
+    std = x.std()
+    mean = x.mean()
+    n = len(x)
+    y_err = std * np.sqrt(1 / n + (x - mean) ** 2 / np.sum((x - mean) ** 2))
+    ax.fill_between(x, y - y_err, y + y_err, alpha=0.2)
     return ax
 
 
-def TablePlot(
+def LDHeatmapPlot(
         df: pd.DataFrame,
         ax: axes.Axes = None):
+    """
+    LD heatmap plot
+
+    Parameters
+    ----------
+    :param df: a dataframe with MxN R^2 values only
+    :param ax: matplotlib axes object
+    :return: matplotlib axes object
+    """
     if ax is None:
         ax = plt.gca()
 
-    ax.axis('off')
-    ax.axis('tight')
-    ax.table(cellText=df.values, colLabels=df.columns, loc='center')
+    # get R^2 values
+    data = df.to_numpy()
 
-    return ax
+    patches = []
+    colors = []
+    cmap = mpl.colormaps['Reds']
+    norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    n = data.shape[0]
+    for i, y in enumerate(reversed(np.arange(n+1))):
+        colors.extend(np.diag(np.tril(data), -i))
+        for x in np.arange(0.5, y+0.5):
+            patches.append(RegularPolygon((x+i*0.5, y-n*0.5+i*0.5), numVertices=4, radius=0.5))
 
+    patch_collection = PatchCollection(patches)
+    patch_collection.set_array(colors)
+    patch_collection.set_cmap(cmap)
+    patch_collection.set_norm(norm)
 
-def BarPlot(
-        df: pd.DataFrame,
-        x_col: int = 0,
-        y_col: int | list = 1,
-        ax: axes.Axes = None):
-    if ax is None:
-        ax = plt.gca()
+    ax.add_collection(patch_collection)
+    ax.set_aspect('equal')
+    ax.set_xlim(0, n)
+    ax.set_ylim(0, n/2 + 0.5)
 
-    x_data = df.iloc[:, x_col].to_numpy()
-    y_data = df.iloc[:, y_col].to_numpy()
-
-    if np.unique(x_data).size != x_data.size:
-        raise ValueError('The value of x_col must be unique')
-
-    if isinstance(y_col, int):
-        ax.bar(x_data, y_data)
-        return ax
-
-    for i in range(len(y_col)):
-        ax.bar(x_data, y_data[:, i], bottom=y_data[:, :i].sum(axis=1))
+    # Add color bar
+    cax = ax.inset_axes([0.8, 0, 0.03, 0.5])
+    ax.figure.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, shrink=.5, label=r"$R^2$")
+    # Turn axis off
+    ax.set_axis_off()
 
     return ax
