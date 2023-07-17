@@ -10,10 +10,11 @@ import pandas as pd
 from scipy import stats
 import matplotlib as mpl
 from matplotlib import figure, axes
-from matplotlib.patches import RegularPolygon
+from matplotlib.patches import RegularPolygon, Patch
 from matplotlib.collections import PatchCollection
 from matplotlib.text import OffsetFrom
 import matplotlib.pyplot as plt
+import geopandas as gpd
 
 
 def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
@@ -77,6 +78,7 @@ def ManhattanPlot(
         threshold0: float = None,
         threshold1: float = None,
         chr_names: list | str = None,
+        log: bool = False,
         colors: list = None,
         style: str = 'line',
         fig: figure.Figure = None):
@@ -87,11 +89,12 @@ def ManhattanPlot(
     ----------
     Support line and scatter style \n
     Support multiple value columns \n
-    Support multiple or selected chromosomes \n
+    Support multiple or selected chromosomes to plot \n
+    Support annotation \n
 
     Parameters
     ----------
-    :param df: dataframe with columns of chromosome, position and p-value at least
+    :param df: dataframe with columns of chromosome, position and value at least
     :param chr_col: column index of chromosome
     :param pos_col: column index of position
     :param value_col: column index of value or list of column index of value
@@ -99,6 +102,7 @@ def ManhattanPlot(
     :param threshold0: threshold for significant p-value
     :param threshold1: threshold for extremely significant p-value
     :param chr_names: list of chromosome names selected to plot
+    :param log: whether to plot -log10(value)
     :param colors: list of colors for each chromosome
     :param style: {'line', 'scatter'}, default 'line', style of plot
     :param fig: matplotlib figure object
@@ -119,8 +123,10 @@ def ManhattanPlot(
     # transform ydata
     if isinstance(value_col, int):
         value_col = [value_col]
-    ydata = df.iloc[:, value_col]
-    ydata = -np.log10(ydata.to_numpy())
+    ydata = df.iloc[:, value_col].to_numpy()
+
+    if log:
+        ydata = -np.log10(ydata)
 
     # transform annotation
     if ann_col is not None:
@@ -232,6 +238,9 @@ def QQPlot(
 
 def LDHeatmapPlot(
         df: pd.DataFrame,
+        plot_diag: bool = True,
+        plot_value: bool = False,
+        cmap: any([str, 'Colormap']) = None,
         ax: axes.Axes = None):
     """
     LD heatmap plot
@@ -239,6 +248,9 @@ def LDHeatmapPlot(
     Parameters
     ----------
     :param df: a dataframe with MxN R^2 values only
+    :param plot_diag: whether to plot diagonal
+    :param plot_value: whether to plot value
+    :param cmap: colormap, can be a string or a matplotlib colormap object
     :param ax: matplotlib axes object
     :return: matplotlib axes object
     """
@@ -248,30 +260,137 @@ def LDHeatmapPlot(
     # get R^2 values
     data = df.to_numpy()
 
-    patches = []
-    colors = []
-    cmap = mpl.colormaps['Reds']
-    norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    # whether to plot diagonal
+    start = 0
+    stop = data.shape[0]
     n = data.shape[0]
-    for i, y in enumerate(reversed(np.arange(n+1))):
-        colors.extend(np.diag(np.tril(data), -i))
-        for x in np.arange(0.5, y+0.5):
-            patches.append(RegularPolygon((x+i*0.5, y-n*0.5+i*0.5), numVertices=4, radius=0.5))
+    if not plot_diag:
+        start = 1
+
+    # set colormap
+    if cmap is None:
+        cmap = 'Reds'
+    cmap = mpl.colormaps.get_cmap(cmap)
+    norm = mpl.colors.Normalize(vmin=0, vmax=1)
+
+    # get patch collection to plot
+    patches = []
+    values = []
+    # for loop along the lower triangle of the matrix, then get the diagonal values
+    for i in np.arange(start, stop):
+        diag_values = np.diag(data, -i)
+        values.extend(diag_values)
+        for j in np.arange(0.5, len(diag_values) + 0.5):
+            patches.append(RegularPolygon((j + i * 0.5, (n - i) / 2), numVertices=4, radius=0.5))
 
     patch_collection = PatchCollection(patches)
-    patch_collection.set_array(colors)
+    patch_collection.set_array(values)
     patch_collection.set_cmap(cmap)
     patch_collection.set_norm(norm)
 
     ax.add_collection(patch_collection)
     ax.set_aspect('equal')
-    ax.set_xlim(0, n)
-    ax.set_ylim(0, n/2 + 0.5)
+    ax.set_xlim(-0.1 + start - 0.5, n - start + 0.5 + 0.1)
+    ax.set_ylim(-0.1, (n - start) / 2 + 0.5 + 0.1)
 
     # Add color bar
-    cax = ax.inset_axes([0.8, 0, 0.03, 0.5])
+    cax = ax.inset_axes([0.8, 0.01, 0.03, 0.5])
     ax.figure.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, shrink=.5, label=r"$R^2$")
+
+    # Add text
+    # Loop over data dimensions and create text annotations.
+    # Change the text's color depending on the data.
+    # Change the font's size depending on the patch.
+    if plot_value:
+        text_colors = ("black", "white")
+        color_array = patch_collection.get_array()
+        threshold = patch_collection.norm(color_array.max()) / 2
+        for i, p in enumerate(patches):
+            text = ax.text(p.xy[0], p.xy[1], "{:.2f}".format(values[i]),
+                           ha="center", va="center",
+                           color=text_colors[int(values[i] > threshold)])
+            patch_bbox = p.get_window_extent()
+            text_width = text.get_window_extent().transformed(ax.transData.inverted()).width
+            font_size = text.get_fontsize()
+            while font_size > 1 and text_width > patch_bbox.width / 2:
+                font_size -= 1
+                text.set_fontsize(font_size)
+                text_width = text.get_window_extent().transformed(ax.transData.inverted()).width
+
     # Turn axis off
     ax.set_axis_off()
+
+    return ax
+
+
+def GeoMapPlot(df: pd.DataFrame,
+               lon_col: int = 0,
+               lat_col: int = 1,
+               value_col: int | list = 2,
+               map_file: str = None,
+               bound_file: str = None,
+               ax: axes.Axes = None):
+    """
+    Geographical map plot
+
+    Parameters
+    ----------
+    :param df: a dataframe with at least three columns: 'latitude', 'longitude' and 'value'
+    :param lon_col: column index of longitude
+    :param lat_col: column index of latitude
+    :param value_col: column index of value
+    :param map_file: map file path, should be a shapefile or a geojson file or json file
+    :param bound_file: boundary file path, should be a shapefile or a geojson file or json file
+    :param ax: matplotlib axes object
+    :return: matplotlib axes object
+    """
+    xy_data = df.iloc[:, [lon_col, lat_col]].to_numpy()
+    if isinstance(value_col, int):
+        value_col = [value_col]
+    value_data = df.iloc[:, value_col].to_numpy()
+    value_sum = np.sum(value_data, axis=1)
+    value_percent = np.cumsum(value_data, axis=1) / value_sum[:, None]
+    print(value_percent)
+
+    if ax is None:
+        ax = plt.gca()
+
+    # plot map
+    if map_file is None:
+        raise ValueError("map_file is not specified")
+    map_data = gpd.read_file(map_file)
+    map_data.plot(ax=ax, color='white', edgecolor='lightgray')
+
+    # plot boundary
+    if bound_file is not None:
+        bound_data = gpd.read_file(bound_file)
+        bound_data.plot(ax=ax, color='mediumpurple', linewidth=3, alpha=0.4)
+
+    ax.set_aspect('equal')
+
+    # scatter plot for the size of each point
+    scatter = ax.scatter(xy_data[:, 0], xy_data[:, 1], s=value_sum, c='white', edgecolors='m')
+
+    # scatter plot using pie shape marker to show the percentage of each value
+    # https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Wedge.html#matplotlib.patches.Wedge
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for i in range(value_percent.shape[0]):
+        for j in range(value_percent.shape[1]):
+            theta = 2 * np.pi * np.linspace(value_percent[i, j - 1] if j > 0 else 0, value_percent[i, j], 100)
+            vertices = np.column_stack([np.cos(theta), np.sin(theta)])
+            ax.scatter(xy_data[i, 0], xy_data[i, 1],
+                       marker=np.append(vertices, [[0, 0]], axis=0),
+                       s=value_sum[i], c=colors[j], linewidths=0)
+
+    # add the legend for different values
+    legend = ax.legend(
+        handles=[Patch(color=colors[i], label=l) for i, l in enumerate(df.iloc[:, value_col].columns)],
+        loc="lower left", title="Values", frameon=False
+    )
+    ax.add_artist(legend)
+
+    # produce a legend with a cross-section of sizes from the scatter
+    handles, labels = scatter.legend_elements(prop="sizes", num=5, markeredgecolor='m', markerfacecolor='w')
+    ax.legend(handles, labels, loc="lower right", title="Sizes", frameon=False)
 
     return ax

@@ -18,6 +18,5 @@ df = pd.DataFrame(
 )
 
 fig, ax = plt.subplots(figsize=(5, 5))
-LDHeatmapPlot(df)
+LDHeatmapPlot(df, plot_value=True, cmap='Reds')
 plt.show()
-
