@@ -24,11 +24,9 @@ data = pd.DataFrame({
     'value3': value3
 })
 
-print(data)
-
 map_file = "D:\\Bio-script\\codes\\haplot\\china_data.json"
 bound_file = "D:\\Bio-script\\codes\\haplot\\bound_data.geojson"
 
 fig, ax = plt.subplots(figsize=(5, 5))
-GeoMapPlot(data, value_col=[2, 3, 4], map_file=map_file, bound_file=bound_file)
+GeoMapPlot(data, value_col=2, map_file=map_file, bound_file=bound_file)
 plt.show()

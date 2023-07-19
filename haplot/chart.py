@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import matplotlib as mpl
-from matplotlib import figure, axes
+from matplotlib import figure, axes, ticker
 from matplotlib.patches import RegularPolygon, Patch
+from matplotlib.lines import Line2D
 from matplotlib.collections import PatchCollection
 from matplotlib.text import OffsetFrom
 import matplotlib.pyplot as plt
@@ -350,7 +351,6 @@ def GeoMapPlot(df: pd.DataFrame,
     value_data = df.iloc[:, value_col].to_numpy()
     value_sum = np.sum(value_data, axis=1)
     value_percent = np.cumsum(value_data, axis=1) / value_sum[:, None]
-    print(value_percent)
 
     if ax is None:
         ax = plt.gca()
@@ -394,3 +394,172 @@ def GeoMapPlot(df: pd.DataFrame,
     ax.legend(handles, labels, loc="lower right", title="Sizes", frameon=False)
 
     return ax
+
+
+def HistPlot(df: pd.DataFrame,
+             value_col: int | list = 0,
+             bins: int | list = 10,
+             orientation: str = 'vertical',
+             plot_cdf: bool = False,
+             plot_ci: bool = False,
+             plot_pdf: bool = False,
+             ax: axes.Axes = None):
+    """
+    Histogram plot
+
+    Parameters
+    ----------
+    :param df: a dataframe with at least one column: 'value'
+    :param value_col: column index of value
+    :param bins: number of bins, can be int or list
+    :param orientation: 'vertical' or 'horizontal'
+    :param plot_cdf: whether to plot the cumulative distribution function
+    :param plot_ci: whether to plot the confidence interval
+    :param plot_pdf: whether to plot the probability density function
+    :param ax: matplotlib axes object
+    :return: matplotlib axes object
+    """
+    if isinstance(value_col, int):
+        value_col = [value_col]
+    data = df.iloc[:, value_col].to_numpy()
+    # calculate the mean and standard deviation of data
+    mean = np.mean(data, axis=0)
+    std = np.std(data, axis=0)
+
+    if ax is None:
+        ax = plt.gca()
+
+    # plot histogram
+    n, bins, patches = ax.hist(data, bins=bins, orientation=orientation,
+                               edgecolor='white', linewidth=.1, density=True)
+    if orientation == 'vertical':
+        ax.spines[['top', 'bottom']].set_visible(False)
+        ax.set_ylabel("Density")
+        ax.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+    else:
+        ax.spines[['left', 'right']].set_visible(False)
+        ax.set_xlabel("Density")
+        ax.tick_params(axis='y', which='both', left=False, right=False, labelleft=False)
+    # add legend
+    # plot the confidence interval for each value
+    if plot_ci:
+        for m, s in zip(mean, std):
+            ci = stats.norm.interval(0.95, loc=m, scale=s)
+            # add the confidence interval to the plot
+            if orientation == 'vertical':
+                ax.axvline(x=ci[0], c='C7', linewidth=1, linestyle='--')
+                ax.axvline(x=ci[1], c='C7', linewidth=1, linestyle='--')
+            else:
+                ax.axhline(y=ci[0], c='C7', linewidth=1, linestyle='--')
+                ax.axhline(y=ci[1], c='C7', linewidth=1, linestyle='--')
+            # change the color of the patch according to the confidence interval
+            for i, p in enumerate(patches):
+                if bins[i] < ci[0]:
+                    p.set_facecolor('C2')
+                elif bins[i] > ci[1]:
+                    p.set_facecolor('C3')
+                else:
+                    p.set_facecolor('C7')
+    # plot the probability density function
+    if plot_pdf:
+        for m, s in zip(mean, std):
+            ax.plot(bins, stats.norm.pdf(bins, loc=m, scale=s), c='black', linewidth=1)
+    # plot the cumulative distribution function
+    if plot_cdf:
+        for m, s in zip(mean, std):
+            if orientation == 'vertical':
+                ax_twin = ax.twinx()
+                ax_twin.plot(bins, stats.norm.cdf(bins, loc=m, scale=s), c='black', linewidth=1)
+                ax_twin.spines[['top', 'bottom']].set_visible(False)
+                ax_twin.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=0, symbol=None))
+                ax_twin.set_ylabel('Cumulative (%)')
+                ax_twin.set_ylim(0, 1)
+            else:
+                ax_twin = ax.twiny()
+                ax_twin.plot(stats.norm.cdf(bins, loc=m, scale=s), bins, c='black', linewidth=1)
+                ax_twin.spines[['left', 'right']].set_visible(False)
+                ax_twin.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=0, symbol=None))
+                ax_twin.set_xlabel('Cumulative (%)')
+                ax_twin.set_xlim(0, 1)
+
+    return ax
+
+
+def PiWithFstPlot(df: pd.DataFrame,
+                  pi_ratio_col: int = 0,
+                  fst_col: int = 1,
+                  fig: figure.Figure = None):
+    """
+    Pi ratio with Fst plot
+
+    Parameters
+    ----------
+    :param df: a dataframe with at least two columns: 'fst' and 'pi ratio'
+    :param pi_ratio_col: column index of pi ratio value
+    :param fst_col: column index of fst value
+    :param fig: matplotlib figure object
+    :return: matplotlib figure object
+    """
+
+    # data preparation
+    xdata = df.iloc[:, pi_ratio_col].to_numpy()
+    # get confidence interval of pi ratio using normal distribution with 95% confidence level
+    x_ci = stats.norm.interval(0.95, loc=np.mean(xdata), scale=np.std(xdata))
+
+    # calculate the mean and standard deviation of fst
+    ydata = df.iloc[:, fst_col].to_numpy()
+    # get confidence interval of fst using normal distribution with 95% confidence level
+    y_ci = stats.norm.interval(0.95, loc=np.mean(ydata), scale=np.std(ydata))
+
+    # subset data by confidence interval
+    data = np.column_stack((xdata, ydata))
+    data_top0 = data[np.all([data[:, 0] < x_ci[0], data[:, 1] > y_ci[1]], axis=0)]
+    data_top1 = data[np.all([data[:, 0] > x_ci[1], data[:, 1] > y_ci[1]], axis=0)]
+
+    # get figure object
+    if fig is None:
+        fig = plt.gcf()
+
+    # create GridSpec object
+    gs = fig.add_gridspec(2, 2, width_ratios=(3, 1), height_ratios=(1, 3),
+                          left=0.1, right=0.9, bottom=0.1, top=0.9,
+                          wspace=0.02, hspace=0.02)
+
+    # create axes object
+    ax = fig.add_subplot(gs[1, 0])
+    ax_x = fig.add_subplot(gs[0, 0], sharex=ax)
+    ax_y = fig.add_subplot(gs[1, 1], sharey=ax)
+
+    # plot scatter
+    ax.scatter(xdata, ydata, s=10, c='black')
+    if data_top0.shape[0] > 0:
+        ax.scatter(data_top0[:, 0], data_top0[:, 1], s=10, c='C2')
+    if data_top1.shape[0] > 0:
+        ax.scatter(data_top1[:, 0], data_top1[:, 1], s=10, c='C3')
+    legend_lines = [Line2D([0], [0], color='black', lw=4),
+                    Line2D([0], [0], color='C2', lw=4),
+                    Line2D([0], [0], color='C3', lw=4)]
+    ax.legend(
+        legend_lines,
+        [
+            'Whole genome',
+            'Selected region (<{:.2f},>{:.2f})'.format(x_ci[0], y_ci[1]),
+            'Selected region (>{:.2f},>{:.2f})'.format(x_ci[1], y_ci[1])
+        ],
+        loc='upper left', frameon=False
+    )
+    ax.set_xlabel('Log10(Pi ratio)')
+    ax.set_ylabel('Fst')
+    ax.axvline(x=x_ci[0], c='C7', linewidth=1, linestyle='--')
+    ax.axvline(x=x_ci[1], c='C7', linewidth=1, linestyle='--')
+    ax.axhline(y=y_ci[0], c='C7', linewidth=1, linestyle='--')
+    ax.axhline(y=y_ci[1], c='C7', linewidth=1, linestyle='--')
+    # change the color of the point combine x and y confidence interval
+
+    # plot hist for x
+    HistPlot(df, 0, bins=50, orientation='vertical', ax=ax_x, plot_pdf=False, plot_cdf=True, plot_ci=True)
+
+    # plot hist for y
+    HistPlot(df, 1, bins=50, orientation='horizontal', ax=ax_y, plot_pdf=False, plot_cdf=True, plot_ci=True)
+
+    return fig
