@@ -9,10 +9,12 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import matplotlib as mpl
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import figure, axes, ticker
 from matplotlib.patches import RegularPolygon, Patch
 from matplotlib.lines import Line2D
-from matplotlib.collections import PatchCollection
+from matplotlib.collections import PatchCollection, LineCollection
+from matplotlib.transforms import Affine2D
 from matplotlib.text import OffsetFrom
 import matplotlib.pyplot as plt
 import geopandas as gpd
@@ -241,6 +243,7 @@ def LDHeatmapPlot(
         df: pd.DataFrame,
         plot_diag: bool = True,
         plot_value: bool = False,
+        plot_snp: bool = False,
         cmap: any([str, 'Colormap']) = None,
         ax: axes.Axes = None):
     """
@@ -251,6 +254,7 @@ def LDHeatmapPlot(
     :param df: a dataframe with MxN R^2 values only
     :param plot_diag: whether to plot diagonal
     :param plot_value: whether to plot value
+    :param plot_snp: whether to plot SNP location
     :param cmap: colormap, can be a string or a matplotlib colormap object
     :param ax: matplotlib axes object
     :return: matplotlib axes object
@@ -291,7 +295,7 @@ def LDHeatmapPlot(
 
     ax.add_collection(patch_collection)
     ax.set_aspect('equal')
-    ax.set_xlim(-0.1 + start - 0.5, n - start + 0.5 + 0.1)
+    ax.set_xlim(start * 0.5, stop - start * 0.5)
     ax.set_ylim(-0.1, (n - start) / 2 + 0.5 + 0.1)
 
     # Add color bar
@@ -317,6 +321,29 @@ def LDHeatmapPlot(
                 font_size -= 1
                 text.set_fontsize(font_size)
                 text_width = text.get_window_extent().transformed(ax.transData.inverted()).width
+
+    # Add SNP location
+    # get SNP location from dataframe index name 'pos'
+    if plot_snp and 'pos' in df.index.names:
+        snp_loc = df.index.get_level_values('pos').to_numpy()
+        sx = (stop - start) / (np.max(snp_loc) - np.min(snp_loc))
+        scale_loc = Affine2D().\
+            translate(-np.min(snp_loc), ty=0).\
+            scale(sx=sx, sy=1).\
+            translate(tx=start * 0.5, ty=0).\
+            transform(np.column_stack([snp_loc, [1] * n]))
+        line_collection = LineCollection([[[a[0], 1], [i+0.5, 0]] for i, a in enumerate(scale_loc)], linewidths=.5)
+        line_collection.set_color('black')
+
+        ax_divider = make_axes_locatable(ax)
+        ax_snp = ax_divider.append_axes("top", size="10%", pad="0%", sharex=ax)
+        ax_snp.add_collection(line_collection)
+        ax_snp.set_xlim(start * 0.5, stop - start * 0.5)
+        ax_snp.set_ylim(0, 1)
+        ax_snp.set_xticks([])
+        ax_snp.set_yticks([])
+        ax_snp.set_yticklabels([])
+        ax_snp.spines.bottom.set_visible(False)
 
     # Turn axis off
     ax.set_axis_off()

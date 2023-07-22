@@ -11,12 +11,17 @@ from haplot.chart import LDHeatmapPlot
 
 np.random.seed(123)
 # generate random R^2 value for ld heatmap plot
+# snp id and snp position
+arrays = [['rs{}'.format(i + 1) for i in range(10)],
+          np.sort(np.random.randint(1, 1000000, 10))]
+index = pd.MultiIndex.from_arrays(arrays, names=('rs_id', 'pos'))
+
 df = pd.DataFrame(
     data=np.random.uniform(0, 1, (10, 10)),
-    index=['rs{}'.format(i + 1) for i in range(10)],
-    columns=['rs{}'.format(i + 1) for i in range(10)]
+    index=index,
+    columns=index
 )
 
 fig, ax = plt.subplots(figsize=(5, 5))
-LDHeatmapPlot(df, plot_value=True, cmap='Reds')
+LDHeatmapPlot(df, plot_value=True, plot_snp=True, plot_diag=False, cmap='Reds')
 plt.show()
