@@ -7,7 +7,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from haplot.chart import TablePlot
 from haplot.data import generate_table_data
 
 
