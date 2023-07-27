@@ -81,6 +81,7 @@ def ManhattanPlot(
         threshold0: float = None,
         threshold1: float = None,
         chr_names: list | str = None,
+        value_layout: str = 'stack',
         log: bool = False,
         colors: list = None,
         style: str = 'line',
@@ -105,6 +106,7 @@ def ManhattanPlot(
     :param threshold0: threshold for significant p-value
     :param threshold1: threshold for extremely significant p-value
     :param chr_names: list of chromosome names selected to plot
+    :param value_layout: {'stack', 'overlay'}, default 'stack', layout of value
     :param log: whether to plot -log10(value)
     :param colors: list of colors for each chromosome
     :param style: {'line', 'scatter'}, default 'line', style of plot
@@ -160,28 +162,39 @@ def ManhattanPlot(
         fig = plt.gcf()
 
     # create GridSpec object
-    gs = fig.add_gridspec(len(value_col), 1)
+    if value_layout == 'stack':
+        gs = fig.add_gridspec(len(value_col), 1)
+        ax = [fig.add_subplot(gs[i, 0]) for i in range(len(value_col))]
+    elif value_layout == 'overlay':
+        gs = fig.add_gridspec(1, 1)
+        ax_ = fig.add_subplot(gs[0, 0])
+        ax = [ax_ for _ in range(len(value_col))]
+    else:
+        raise ValueError('value_layout must be "stack" or "overlay"')
     # add plot
     for i in range(len(value_col)):
-        ax = fig.add_subplot(gs[i, 0])
-        ax.set_title(df.columns[value_col[i]])
+        ax[i].set_title(df.columns[value_col[i]])
 
-        if style == 'scatter':
-            ax.scatter(xdata_new.to_numpy().flatten(), ydata[:, i], color=cdata, s=0.5)
-        elif style == 'line':
-            ax.vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=cdata, linewidth=0.5)
+        if style == 'scatter' and value_layout == 'stack':
+            ax[i].scatter(xdata_new.to_numpy().flatten(), ydata[:, i], color=cdata, s=0.5)
+        elif style == 'scatter' and value_layout == 'overlay':
+            ax[i].scatter(xdata_new.to_numpy().flatten(), ydata[:, i], s=0.5)
+        elif style == 'line' and value_layout == 'stack':
+            ax[i].vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=cdata, linewidth=0.5)
+        elif style == 'line' and value_layout == 'overlay':
+            ax[i].vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=next(colors), linewidth=0.5)
         else:
             raise ValueError('style must be "line" or "scatter"')
 
         if i != len(value_col) - 1:
-            ax.set_xticks([])
+            ax[i].set_xticks([])
         else:
-            ax.set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
+            ax[i].set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
 
         if threshold0 is not None:
-            ax.axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
+            ax[i].axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
         if threshold1 is not None:
-            ax.axhline(-np.log10(threshold1), color='gray', linewidth=0.5)
+            ax[i].axhline(-np.log10(threshold1), color='gray', linewidth=0.5)
 
         # add annotation
         if ann_data is not None:
@@ -190,7 +203,7 @@ def ManhattanPlot(
             ann_y = ydata[ann_index, i]
             # add an annotation for each point
             for xi, yi, text in zip(ann_x, ann_y, ann_data.to_numpy()):
-                ax.annotate(
+                ax[i].annotate(
                     text,
                     xy=(xi, yi), xycoords='data',
                     xytext=(30, 10), textcoords='offset points',
@@ -327,12 +340,12 @@ def LDHeatmapPlot(
     if plot_snp and 'pos' in df.index.names:
         snp_loc = df.index.get_level_values('pos').to_numpy()
         sx = (stop - start) / (np.max(snp_loc) - np.min(snp_loc))
-        scale_loc = Affine2D().\
-            translate(-np.min(snp_loc), ty=0).\
-            scale(sx=sx, sy=1).\
-            translate(tx=start * 0.5, ty=0).\
+        scale_loc = Affine2D(). \
+            translate(-np.min(snp_loc), ty=0). \
+            scale(sx=sx, sy=1). \
+            translate(tx=start * 0.5, ty=0). \
             transform(np.column_stack([snp_loc, [1] * n]))
-        line_collection = LineCollection([[[a[0], 1], [i+0.5, 0]] for i, a in enumerate(scale_loc)], linewidths=.5)
+        line_collection = LineCollection([[[a[0], 1], [i + 0.5, 0]] for i, a in enumerate(scale_loc)], linewidths=.5)
         line_collection.set_color('black')
 
         ax_divider = make_axes_locatable(ax)
@@ -590,3 +603,104 @@ def PiWithFstPlot(df: pd.DataFrame,
     HistPlot(df, 1, bins=50, orientation='horizontal', ax=ax_y, plot_pdf=False, plot_cdf=True, plot_ci=True)
 
     return fig
+
+
+def GeneStrucPlot(
+        df: pd.DataFrame,
+        gene_col: int = 0,
+        start_col: int = 1,
+        end_col: int = 2,
+        strand_col: int = 3,
+        feature_col: int = 4,
+        ax: axes.Axes = None):
+    """
+    Gene structure plot
+
+    Parameters
+    ----------
+    :param df: a dataframe with at least five columns: 'gene', 'start', 'end', 'strand', 'feature'
+    :param gene_col: column index of gene name
+    :param start_col: column index of start position
+    :param end_col: column index of end position
+    :param strand_col: column index of strand
+    :param feature_col: column index of feature
+    :param ax: matplotlib axes object
+    :return: matplotlib axes object
+    """
+    feature_config = {
+        'CDS': {
+            'color': 'black',
+            'line_width': 8,
+            'line_style': '-'
+        },
+        'intron': {
+            'color': 'black',
+            'line_width': 1,
+            'line_style': '--'
+        },
+        'exon': {
+            'color': 'red',
+            'line_width': 8,
+            'line_style': '-'
+        },
+        '5UTR': {
+            'color': 'black',
+            'line_width': 4,
+            'line_style': '-'
+        },
+        '3UTR': {
+            'color': 'black',
+            'line_width': 4,
+            'line_style': '-'
+        }
+    }
+
+    # get axes object
+    if ax is None:
+        ax = plt.gca()
+
+    # get all genes
+    genes = df.iloc[:, gene_col].unique()
+    # draw gene structure for each gene
+    for gene in genes:
+        # get all features for the gene
+        gene_df = df[df.iloc[:, gene_col] == gene]
+        # get start and end position
+        start = gene_df.iloc[:, start_col].min()
+        end = gene_df.iloc[:, end_col].max()
+        # get strand
+        strand = gene_df.iloc[0, strand_col]
+        # get feature position
+        feature_start = gene_df.iloc[:, start_col].to_numpy()
+        feature_end = gene_df.iloc[:, end_col].to_numpy()
+        # get feature type
+        feature_type = gene_df.iloc[:, feature_col].to_numpy()
+        # get feature color
+        feature_color = np.array([feature_config[x]['color'] for x in feature_type])
+        # get feature line width
+        feature_line_width = np.array([feature_config[x]['line_width'] for x in feature_type])
+        # get feature line style
+        feature_line_style = np.array([feature_config[x]['line_style'] for x in feature_type])
+        # get feature position
+        feature_position = np.column_stack((feature_start, feature_end))
+        # get feature position for positive strand
+        if strand == '+':
+            feature_position = feature_position[np.argsort(feature_start)]
+        # get feature position for negative strand
+        else:
+            feature_position = feature_position[np.argsort(feature_end)[::-1]]
+        # plot feature
+        for i in range(feature_position.shape[0]):
+            ax.plot(feature_position[i, :], [.5, .5], c=feature_color[i], lw=feature_line_width[i],
+                    ls=feature_line_style[i])
+        # plot gene
+        ax.plot([start, end], [.5, .5], c='black', lw=1)
+        # plot strand
+        if strand == '+':
+            ax.text(end, .5, '>', fontsize=10, ha='right', va='center')
+        else:
+            ax.text(start, .5, '<', fontsize=10, ha='left', va='center')
+        # plot gene name
+        ax.text((start + end) / 2, .5, gene, fontsize=10, ha='center', va='center')
+
+    return ax

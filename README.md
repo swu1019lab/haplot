@@ -1,10 +1,14 @@
 # haplot
 An easy-to-use python package can be used for omics visual analysis
 
-## Installation
-```bash
-pip install haplot
-```
+## Dependencies
+- python >= 3.10
+- numpy >= 1.22.3
+- pandas >= 1.4.2
+- matplotlib >= 3.6.2
+- scipy >= 1.9.3
+- geopandas >= 0.13.2
+
 
 ## Usage
 ```python
@@ -12,7 +16,7 @@ import haplot as hp
 ```
 
 ## Functions
-### 1. plot_heatmap
+### 1. LDHeatmapPlot
 ```python
 import numpy as np
 import pandas as pd

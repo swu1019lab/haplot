@@ -12,9 +12,9 @@ from haplot.theme import ManhattanTheme
 
 np.random.seed(123)
 # generate random data for manhattan plot
-df = generate_data(sort=True)
+df = generate_data(sort=True, snp_num=1000, gene_num=2)
 # print(df)
 fig = plt.figure(figsize=(10, 5))
-ManhattanPlot(df, value_col=[2, 3], ann_col=4)
+ManhattanPlot(df, value_col=[2, 3], value_layout='stack', style='scatter', log=True)
 ManhattanTheme.apply()
 plt.show()
