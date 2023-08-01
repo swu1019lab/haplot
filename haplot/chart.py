@@ -11,7 +11,7 @@ from scipy import stats
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import figure, axes, ticker
-from matplotlib.patches import RegularPolygon, Patch
+from matplotlib.patches import RegularPolygon, Patch, Rectangle, FancyArrowPatch, ArrowStyle
 from matplotlib.lines import Line2D
 from matplotlib.collections import PatchCollection, LineCollection
 from matplotlib.transforms import Affine2D
@@ -616,6 +616,11 @@ def GeneStrucPlot(
     """
     Gene structure plot
 
+    For each gene, the plot will show the gene structure, including CDS, intron and exon.\n
+    Features
+    --------
+    The plot will show the gene structure, including CDS, intron and exon.\n
+
     Parameters
     ----------
     :param df: a dataframe with at least five columns: 'gene', 'start', 'end', 'strand', 'feature'
@@ -629,29 +634,34 @@ def GeneStrucPlot(
     """
     feature_config = {
         'CDS': {
-            'color': 'black',
-            'line_width': 8,
-            'line_style': '-'
+            'color': 'blue',
+            # height should be limited within [0, 1]
+            'height': 0.15,
+            'patch': 'rectangle'
         },
         'intron': {
             'color': 'black',
-            'line_width': 1,
-            'line_style': '--'
+            # height should be limited within [0, 1]
+            'height': 0.05,
+            'patch': 'arrow'
         },
         'exon': {
-            'color': 'red',
-            'line_width': 8,
-            'line_style': '-'
+            'color': 'blue',
+            # height should be limited within [0, 1]
+            'height': 0.15,
+            'patch': 'rectangle'
         },
         '5UTR': {
-            'color': 'black',
-            'line_width': 4,
-            'line_style': '-'
+            'color': 'lightgray',
+            # height should be limited within [0, 1]
+            'height': 0.1,
+            'patch': 'rectangle'
         },
         '3UTR': {
-            'color': 'black',
-            'line_width': 4,
-            'line_style': '-'
+            'color': 'lightgray',
+            # height should be limited within [0, 1]
+            'height': 0.1,
+            'patch': 'rectangle'
         }
     }
 
@@ -659,48 +669,61 @@ def GeneStrucPlot(
     if ax is None:
         ax = plt.gca()
 
-    # get all genes
-    genes = df.iloc[:, gene_col].unique()
-    # draw gene structure for each gene
-    for gene in genes:
-        # get all features for the gene
-        gene_df = df[df.iloc[:, gene_col] == gene]
-        # get start and end position
-        start = gene_df.iloc[:, start_col].min()
-        end = gene_df.iloc[:, end_col].max()
-        # get strand
-        strand = gene_df.iloc[0, strand_col]
-        # get feature position
-        feature_start = gene_df.iloc[:, start_col].to_numpy()
-        feature_end = gene_df.iloc[:, end_col].to_numpy()
-        # get feature type
-        feature_type = gene_df.iloc[:, feature_col].to_numpy()
-        # get feature color
-        feature_color = np.array([feature_config[x]['color'] for x in feature_type])
-        # get feature line width
-        feature_line_width = np.array([feature_config[x]['line_width'] for x in feature_type])
-        # get feature line style
-        feature_line_style = np.array([feature_config[x]['line_style'] for x in feature_type])
-        # get feature position
-        feature_position = np.column_stack((feature_start, feature_end))
-        # get feature position for positive strand
-        if strand == '+':
-            feature_position = feature_position[np.argsort(feature_start)]
-        # get feature position for negative strand
-        else:
-            feature_position = feature_position[np.argsort(feature_end)[::-1]]
-        # plot feature
-        for i in range(feature_position.shape[0]):
-            ax.plot(feature_position[i, :], [.5, .5], c=feature_color[i], lw=feature_line_width[i],
-                    ls=feature_line_style[i])
+    # scale data
+    x_min = df.iloc[:, start_col].min()
+    x_max = df.iloc[:, end_col].max()
+    df.iloc[:, [start_col, end_col]] = (df.iloc[:, [start_col, end_col]] - x_min) / (x_max - x_min)
+    for name, group in df.groupby(df.columns[gene_col]):
+        # get gene location
+        gene_start = group.iloc[:, start_col].min()
+        gene_end = group.iloc[:, end_col].max()
+        # get gene strand
+        gene_strand = group.iloc[0, strand_col]
+        # get gene feature
+        for feature in group.itertuples(name="Feature", index=False):
+            # get feature location
+            feature_start = feature[start_col]
+            feature_end = feature[end_col]
+            # get feature type
+            feature_type = feature[feature_col]
+            # get feature color
+            feature_color = feature_config[feature_type]['color']
+            # get feature height
+            feature_height = feature_config[feature_type]['height']
+            # get feature patch type
+            feature_patch = feature_config[feature_type]['patch']
+            # plot feature
+            if feature_patch == 'rectangle':
+                ax.add_patch(Rectangle((feature_start, 0.5 - feature_height / 2),
+                                       feature_end - feature_start, feature_height,
+                                       fc=feature_color, ec=feature_color, zorder=3))
+            elif feature_patch == 'arrow' and gene_strand == '+':
+                ax.add_patch(FancyArrowPatch((feature_start, 0.5), (feature_end, 0.5),
+                                             arrowstyle="->", fc=feature_color,
+                                             ec=feature_color, shrinkA=0, shrinkB=0,
+                                             mutation_scale=10, zorder=1))
+            elif feature_patch == 'arrow' and gene_strand == '-':
+                ax.add_patch(FancyArrowPatch((feature_start, 0.5), (feature_end, 0.5),
+                                             arrowstyle="<-", fc=feature_color,
+                                             ec=feature_color, shrinkA=0, shrinkB=0,
+                                             mutation_scale=10, zorder=1))
+            else:
+                raise ValueError('Unknown feature patch type: {}'.format(feature_patch))
         # plot gene
-        ax.plot([start, end], [.5, .5], c='black', lw=1)
-        # plot strand
-        if strand == '+':
-            ax.text(end, .5, '>', fontsize=10, ha='right', va='center')
-        else:
-            ax.text(start, .5, '<', fontsize=10, ha='left', va='center')
-        # plot gene name
-        ax.text((start + end) / 2, .5, gene, fontsize=10, ha='center', va='center')
+        ax.plot([gene_start, gene_end], [0.5, 0.5], c='black', linewidth=1, zorder=2)
+    # set y axis
+    ax.set_ylim(0, 1)
 
+    return ax
+
+
+def GeneticMapPlot(
+        df: pd.DataFrame,
+        ax: axes.Axes = None):
+    return ax
+
+
+def KaryotypePlot(
+        df: pd.DataFrame,
+        ax: axes.Axes = None):
     return ax
