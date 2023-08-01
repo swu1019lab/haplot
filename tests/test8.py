@@ -6,7 +6,6 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch
 import pandas as pd
 from haplot.chart import GeneStrucPlot
 
@@ -64,7 +63,7 @@ def generate_gene_data(
 
 df = generate_gene_data()
 
-fig = plt.figure(figsize=(4, 4))
+fig = plt.figure(figsize=(6, 4))
 ax = fig.add_subplot(111)
 GeneStrucPlot(df)
 plt.show()
