@@ -18,7 +18,6 @@ from matplotlib.transforms import Affine2D
 from matplotlib.text import OffsetFrom
 import matplotlib.pyplot as plt
 import geopandas as gpd
-from utils import auto_text_size
 
 
 def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
@@ -397,10 +396,9 @@ def GeoMapPlot(df: pd.DataFrame,
         ax = plt.gca()
 
     # plot map
-    if map_file is None:
-        raise ValueError("map_file is not specified")
-    map_data = gpd.read_file(map_file)
-    map_data.plot(ax=ax, color='white', edgecolor='lightgray')
+    if map_file is not None:
+        map_data = gpd.read_file(map_file)
+        map_data.plot(ax=ax, color='white', edgecolor='lightgray')
 
     # plot boundary
     if bound_file is not None:
@@ -410,7 +408,10 @@ def GeoMapPlot(df: pd.DataFrame,
     ax.set_aspect('equal')
 
     # scatter plot for the size of each point
-    scatter = ax.scatter(xy_data[:, 0], xy_data[:, 1], s=value_sum, c='white', edgecolors='m')
+    scatter = ax.scatter(xy_data[:, 0], xy_data[:, 1], s=value_sum, edgecolors='m', facecolors=None)
+    print(scatter.get_offsets())
+    print(scatter.get_paths())
+    # add annotation for each point
 
     # scatter plot using pie shape marker to show the percentage of each value
     # https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Wedge.html#matplotlib.patches.Wedge
@@ -426,13 +427,16 @@ def GeoMapPlot(df: pd.DataFrame,
     # add the legend for different values
     legend = ax.legend(
         handles=[Patch(color=colors[i], label=l) for i, l in enumerate(df.iloc[:, value_col].columns)],
-        loc="lower left", title="Values", frameon=False
+        loc="upper left", bbox_to_anchor=(1, 0, 0.1, 1), borderaxespad=0,
+        title="Values", frameon=False
     )
     ax.add_artist(legend)
 
     # produce a legend with a cross-section of sizes from the scatter
     handles, labels = scatter.legend_elements(prop="sizes", num=5, markeredgecolor='m', markerfacecolor='w')
-    ax.legend(handles, labels, loc="lower right", title="Sizes", frameon=False)
+    ax.legend(handles, labels,
+              loc="lower left", bbox_to_anchor=(1, 0, 0.1, 1), borderaxespad=0,
+              title="Sizes", frameon=False)
 
     return ax
 
@@ -656,7 +660,7 @@ def GeneStrucPlot(
             'exon': {
                 'color': 'C0',
                 # height should be limited within [0, 1]
-                'height': 0.15,
+                'height': 0.13,
                 'patch': 'rectangle',
                 'zorder': 2,
                 'alpha': 1
@@ -690,12 +694,11 @@ def GeneStrucPlot(
 
     # plot gene structure
     for name, group in df.groupby(df.columns[gene_col]):
-        print(name)
         # get gene strand
         gene_strand = group.iloc[0, strand_col]
         # get gene start and end
-        gene_start = group.iloc[0, start_col]
-        gene_end = group.iloc[0, end_col]
+        gene_start = group.iloc[:, start_col].min()
+        gene_end = group.iloc[:, end_col].max()
         # get gene feature
         for feature in group.itertuples(name="Feature", index=False):
             # get feature location
@@ -734,17 +737,26 @@ def GeneStrucPlot(
             else:
                 raise ValueError('Unknown feature patch type: {}'.format(feature_patch))
         # add gene name
-        # ax.text(gene_start, 0.5, name, ha='center', va='center', rotation=0, fontsize=8)
-    # set y axis
+        ax.annotate(name, xy=((gene_start + gene_end) / 2, 0.7), xycoords='data',
+                    va='center', ha='center')
+    # adjust annotate position to avoid overlap
+    print(ax.texts)
+    # set y-axis
     ax.set_ylim(0, 1)
-    # set x axis
+    # set x-axis
     ax_twin = ax.twiny()
     ax_twin.set_xlim(x_min, x_max)
     # set x-axis ticks with kb unit
     ax_twin.set_xlabel('Position (kb)')
     ax_twin.xaxis.set_major_formatter(
-        ticker.FuncFormatter(lambda x, pos: '{:.2f}'.format(x/1000))
+        ticker.FuncFormatter(lambda x, pos: '{:.2f}'.format(x / 1000))
     )
+    # hide ticks and spines of ax and ax_twin
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.spines[["left", "bottom", "right"]].set_visible(False)
+    ax_twin.set_yticks([])
+    ax_twin.spines[["left", "bottom", "right"]].set_visible(False)
 
     return ax
 
