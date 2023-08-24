@@ -2,7 +2,7 @@
 # @Time    : 2023/7/17 15:41
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
-# @File    : test6.py
+# @File    : test_geomap.py
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -28,5 +28,5 @@ map_file = "D:\\Bio-script\\codes\\haplot\\china_data.json"
 bound_file = "D:\\Bio-script\\codes\\haplot\\bound_data.geojson"
 
 fig, ax = plt.subplots(figsize=(5, 5))
-GeoMapPlot(data, value_col=2, map_file=map_file, bound_file=bound_file)
+GeoMapPlot(data, value_col=[2, 3, 4])
 plt.show()

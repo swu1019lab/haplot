@@ -2,7 +2,7 @@
 # @Time    : 2023/7/22 20:49
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
-# @File    : test8.py
+# @File    : test_gene_struc.py
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -61,7 +61,7 @@ def generate_gene_data(
     return pd.concat(features_data_list, ignore_index=True)
 
 
-df = generate_gene_data()
+df = generate_gene_data(gene_num=6)
 
 fig = plt.figure(figsize=(6, 4))
 ax = fig.add_subplot(111)

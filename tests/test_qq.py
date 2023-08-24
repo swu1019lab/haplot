@@ -2,7 +2,7 @@
 # @Time    : 2023/7/4 10:30
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
-# @File    : test2.py
+# @File    : test_qq.py
 
 
 import numpy as np

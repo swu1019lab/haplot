@@ -2,7 +2,7 @@
 # @Time    : 2023/7/19 11:15
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
-# @File    : test7.py
+# @File    : test_pi_fst.py
 
 import numpy as np
 import matplotlib.pyplot as plt

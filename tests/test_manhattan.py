@@ -2,7 +2,7 @@
 # @Time    : 2023/7/3 16:44
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
-# @File    : test1.py
+# @File    : test_manhattan.py
 
 import numpy as np
 import matplotlib.pyplot as plt
