@@ -5,7 +5,20 @@
 # @File    : utils.py
 
 
-def auto_text_size(text, patch, ax):
+def adjust_text(texts, ax):
+    """
+    Automatically adjust text position to avoid overlap.
+
+    Parameters
+    ----------
+    :param texts: a list of Text object
+    :param ax: Axes object
+    :return: None
+    """
+    return
+
+
+def text_fit_patch(text, patch, ax):
     """
     Automatically adjust the font size of text to fit the patch.
 
