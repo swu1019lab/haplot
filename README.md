@@ -1,6 +1,6 @@
 # haplot
 
-A set of easy-to-use plot function can be used for genomic visual analysis
+A set of easy-to-use plot functions can be used for genomic visual analysis
 
 ## Functions
 - [x] manhattan and qq plot
