@@ -15,7 +15,6 @@ from matplotlib.patches import RegularPolygon, Patch, Rectangle, FancyArrowPatch
 from matplotlib.lines import Line2D
 from matplotlib.collections import PatchCollection, LineCollection
 from matplotlib.transforms import Affine2D
-from matplotlib.text import OffsetFrom
 import matplotlib.pyplot as plt
 import geopandas as gpd
 
@@ -409,8 +408,8 @@ def GeoMapPlot(df: pd.DataFrame,
 
     # scatter plot for the size of each point
     scatter = ax.scatter(xy_data[:, 0], xy_data[:, 1], s=value_sum, edgecolors='m', facecolors=None)
-    print(scatter.get_offsets())
-    print(scatter.get_paths())
+    scatter.set_visible(False)
+
     # add annotation for each point
 
     # scatter plot using pie shape marker to show the percentage of each value
@@ -758,16 +757,4 @@ def GeneStrucPlot(
     ax_twin.set_yticks([])
     ax_twin.spines[["left", "bottom", "right"]].set_visible(False)
 
-    return ax
-
-
-def GeneticMapPlot(
-        df: pd.DataFrame,
-        ax: axes.Axes = None):
-    return ax
-
-
-def KaryotypePlot(
-        df: pd.DataFrame,
-        ax: axes.Axes = None):
     return ax
