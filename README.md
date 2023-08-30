@@ -8,10 +8,10 @@ A set of easy-to-use plot function can be used for haplotype visual analysis
 - [x] haplotype geographic distribution plot
 - [x] gene structure plot
 - [x] haplotype boxplot
-- [x] neucleotide diversity and Fst plot
+- [x] nucleotide diversity and Fst plot
 
 ## Dependencies
-- python >= 3.10
+haplot support python >= 3.10, with following packages installed:
 - numpy >= 1.22.3
 - pandas >= 1.4.2
 - matplotlib >= 3.6.2
