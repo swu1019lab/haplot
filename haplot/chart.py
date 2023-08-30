@@ -756,5 +756,15 @@ def GeneStrucPlot(
     ax.spines[["left", "bottom", "right"]].set_visible(False)
     ax_twin.set_yticks([])
     ax_twin.spines[["left", "bottom", "right"]].set_visible(False)
+    # set grid
+    ax_twin.xaxis.grid(
+        True,
+        linestyle='--',
+        which='major',
+        color='lightgrey',
+        alpha=.5
+    )
+    # Hide these grid behind plot objects
+    ax_twin.set_axisbelow(True)
 
     return ax
