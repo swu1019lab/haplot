@@ -617,6 +617,8 @@ def GeneStrucPlot(
         strand_col: int = 3,
         feature_col: int = 4,
         feature_config: dict = None,
+        center: int = 0.5,
+        jitter: bool = False,
         ax: axes.Axes = None):
     """
     Gene structure plot
@@ -635,6 +637,8 @@ def GeneStrucPlot(
     :param strand_col: column index of strand
     :param feature_col: column index of feature
     :param feature_config: a dictionary of feature configuration
+    :param center: the center of the feature, should be a float number between 0 and 1
+    :param jitter: whether to jitter the feature to avoid overlap
     :param ax: matplotlib axes object
     :return: matplotlib axes object
     """
@@ -698,6 +702,11 @@ def GeneStrucPlot(
         # get gene start and end
         gene_start = group.iloc[:, start_col].min()
         gene_end = group.iloc[:, end_col].max()
+        # jitter feature
+        if jitter:
+            offset = np.random.uniform(-0.25, 0.25)
+        else:
+            offset = 0
         # get gene feature
         for feature in group.itertuples(name="Feature", index=False):
             # get feature location
@@ -717,18 +726,20 @@ def GeneStrucPlot(
             feature_alpha = feature_config[feature_type]['alpha']
             # plot feature
             if feature_patch == 'rectangle':
-                ax.add_patch(Rectangle((feature_start, 0.5 - feature_height / 2),
+                ax.add_patch(Rectangle((feature_start, center - feature_height / 2 + offset),
                                        feature_end - feature_start, feature_height,
                                        fc=feature_color, ec=feature_color,
                                        zorder=feature_zorder, alpha=feature_alpha))
             elif feature_patch == 'arrow' and gene_strand == '+':
-                ax.add_patch(FancyArrowPatch((feature_start, 0.5), (feature_end, 0.5),
+                ax.add_patch(FancyArrowPatch((feature_start, center + offset),
+                                             (feature_end, center + offset),
                                              arrowstyle="->", fc=feature_color,
                                              ec=feature_color, shrinkA=0, shrinkB=0,
                                              mutation_scale=10, zorder=feature_zorder,
                                              alpha=feature_alpha))
             elif feature_patch == 'arrow' and gene_strand == '-':
-                ax.add_patch(FancyArrowPatch((feature_start, 0.5), (feature_end, 0.5),
+                ax.add_patch(FancyArrowPatch((feature_start, center + offset),
+                                             (feature_end, center + offset),
                                              arrowstyle="<-", fc=feature_color,
                                              ec=feature_color, shrinkA=0, shrinkB=0,
                                              mutation_scale=10, zorder=feature_zorder,
@@ -736,12 +747,21 @@ def GeneStrucPlot(
             else:
                 raise ValueError('Unknown feature patch type: {}'.format(feature_patch))
         # add gene name
-        ax.annotate(name, xy=((gene_start + gene_end) / 2, 0.7), xycoords='data',
+        ax.annotate(name,
+                    xy=((gene_start + gene_end) / 2, center + offset),
+                    xycoords='data',
+                    xytext=(0, 30),
+                    textcoords='offset points',
                     va='center', ha='center')
-    # adjust annotate position to avoid overlap
-    print(ax.texts)
-    # set y-axis
-    ax.set_ylim(0, 1)
+    # add legend for feature
+    legend_elements = []
+    for feature_type, feature_config in feature_config.items():
+        legend_elements.append(Patch(facecolor=feature_config['color'],
+                                     edgecolor=feature_config['color'],
+                                     label=feature_type))
+    ax.legend(handles=legend_elements,
+              loc='upper left', bbox_to_anchor=(0, -0.02, 1, 0.1),
+              borderaxespad=0, ncols=5, mode='expand', frameon=False)
     # set x-axis
     ax_twin = ax.twiny()
     ax_twin.set_xlim(x_min, x_max)
