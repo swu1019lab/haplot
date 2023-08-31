@@ -10,7 +10,7 @@ import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 from haplot.chart import GeoMapPlot
 
-# 查询世界地图上的城市坐标
+# generate data
 # new york
 ny_lon, ny_lat = -75, 43
 # london
