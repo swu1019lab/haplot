@@ -13,7 +13,6 @@ from haplot.chart import GeneStrucPlot
 np.random.seed(20230722)
 
 df = generate_gene_data(gene_num=1)
-
 fig = plt.figure(figsize=(6, 4))
 ax = fig.add_subplot(111)
 GeneStrucPlot(df)
