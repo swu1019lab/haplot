@@ -22,6 +22,9 @@ df = pd.DataFrame(
     columns=index
 )
 
-fig, ax = plt.subplots(figsize=(5, 5))
-LDHeatmapPlot(df, plot_value=True, plot_snp=True, plot_diag=False, cmap='Reds')
+fig, axs = plt.subplots(2, 2, figsize=(5, 5))
+LDHeatmapPlot(df, plot_value=True, plot_snp=True, plot_diag=False, cmap='Reds', ax=axs[0, 0])
+LDHeatmapPlot(df, plot_value=False, plot_snp=True, plot_diag=False, cmap='Reds', ax=axs[0, 1])
+LDHeatmapPlot(df, plot_value=True, plot_snp=True, plot_diag=False, cmap='Blues', ax=axs[1, 0])
+LDHeatmapPlot(df, plot_value=False, plot_snp=True, plot_diag=False, cmap='Blues', ax=axs[1, 1])
 plt.show()
