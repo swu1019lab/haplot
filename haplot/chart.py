@@ -18,6 +18,7 @@ from matplotlib.transforms import Affine2D
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import networkx as nx
+from haplot.utils import AnchoredSizeLegend
 
 
 def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
@@ -841,6 +842,7 @@ def HapNetworkPlot(
     nx.draw_networkx_labels(T, pos, font_size=node_font_size)
 
     # show node data with scatter-pie plot
+    node_size = []
     prop_cycle = plt.rcParams['axes.prop_cycle']
     if colors is None:
         colors = prop_cycle.by_key()['color']
@@ -849,6 +851,7 @@ def HapNetworkPlot(
         for node in T.nodes:
             x, y = pos[node]
             stat_data = node_data[node_data['node'] == node].values[0][1:]
+            node_size.append(np.sum(stat_data))
             # stat percentage of each node and make the sum of percentage to 1
             stat_percentage = np.insert(np.cumsum(stat_data) / np.sum(stat_data), 0, 0)
             # plot scatter-pie
@@ -861,16 +864,29 @@ def HapNetworkPlot(
                            marker=np.append(vertices, [[0, 0]], axis=0),
                            linewidths=0,
                            zorder=2)
-    # add legend for node
+    # add legend for different types within same node
     legend_elements = []
     if node_data is not None:
+        loc = mpl.ticker.MaxNLocator(nbins=2)
+        node_size_label = loc.tick_values(min(node_size), max(node_size))
+        # add legend for different node size
+        asl = AnchoredSizeLegend(
+            node_size_label[1:],
+            node_size_label[1:],
+            label_size=6,
+            loc='center left',
+            pad=0.1, borderpad=0.5,
+            frameon=False
+        )
+        ax.add_artist(asl)
+
         for i, column in enumerate(node_data.columns[1:]):
             legend_elements.append(
                 Patch(facecolor=colors[i], edgecolor=colors[i], label=column)
             )
-    ax.legend(handles=legend_elements,
-              loc='lower left', bbox_to_anchor=(0, 1.02, 1, 0.1),
-              borderaxespad=0, ncols=5, mode='expand', frameon=False)
+        ax.legend(handles=legend_elements,
+                  loc='lower left', bbox_to_anchor=(0, 1.02, 1, 0.1),
+                  borderaxespad=0, ncols=5, mode='expand', frameon=False)
 
     # get edge weights and plot edges with label
     if weight_show:
