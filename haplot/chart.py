@@ -17,6 +17,7 @@ from matplotlib.collections import PatchCollection, LineCollection
 from matplotlib.transforms import Affine2D
 import matplotlib.pyplot as plt
 import geopandas as gpd
+import networkx as nx
 
 
 def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
@@ -786,5 +787,105 @@ def GeneStrucPlot(
     )
     # Hide these grid behind plot objects
     ax_twin.set_axisbelow(True)
+
+    return ax
+
+
+def HapNetworkPlot(
+        edge_data: pd.DataFrame,
+        node_data: pd.DataFrame = None,
+        layout: str = 'spring',
+        colors: list = None,
+        node_font_size: int = 12,
+        weight_show: bool = True,
+        weight_show_style: int = 0,
+        ax: axes.Axes = None):
+    """
+    Plot haplotype network.
+
+    Parameters
+    ----------
+    :param edge_data: a dataFrame with three columns: source, target, weight
+    :param node_data: a dataFrame with node data, at least one column named 'node' and other columns for data statistics
+    :param layout: layout algorithm for networkx
+    :param colors: a list of colors for scatter-pie plot
+    :param node_font_size: font size for node label
+    :param weight_show: whether to show weight of edges
+    :param weight_show_style: 0 for number, 1 for symbol with "|"
+    :param ax: axes object to plot on (default: None)
+    """
+    # get axes object
+    if ax is None:
+        ax = plt.gca()
+
+    # create networkx graph
+    G = nx.from_pandas_edgelist(edge_data,
+                                edge_attr=['weight', 'color'],
+                                create_using=nx.Graph())
+    # Find the minimum spanning tree
+    T = nx.minimum_spanning_tree(G)
+
+    # get node layout and plot nodes with label
+    if layout == 'spring':
+        pos = nx.spring_layout(T)
+    elif layout == 'spectral':
+        pos = nx.spectral_layout(T)
+    elif layout == 'random':
+        pos = nx.random_layout(T)
+    elif layout == 'shell':
+        pos = nx.shell_layout(T)
+    elif layout == 'circular':
+        pos = nx.circular_layout(T)
+    else:
+        raise ValueError('Unknown layout: {}'.format(layout))
+    nx.draw_networkx_labels(T, pos, font_size=node_font_size)
+
+    # show node data with scatter-pie plot
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    if colors is None:
+        colors = prop_cycle.by_key()['color']
+    if node_data is not None:
+        # loop node name in graph, get position and stat data of each node
+        for node in T.nodes:
+            x, y = pos[node]
+            stat_data = node_data[node_data['node'] == node].values[0][1:]
+            # stat percentage of each node and make the sum of percentage to 1
+            stat_percentage = np.insert(np.cumsum(stat_data) / np.sum(stat_data), 0, 0)
+            # plot scatter-pie
+            for i in range(len(stat_percentage) - 1):
+                theta = 2 * np.pi * np.linspace(stat_percentage[i], stat_percentage[i + 1], num=100)
+                vertices = np.column_stack((np.cos(theta), np.sin(theta)))
+                ax.scatter(x, y,
+                           np.sum(stat_data),
+                           colors[i],
+                           marker=np.append(vertices, [[0, 0]], axis=0),
+                           linewidths=0,
+                           zorder=2)
+    # add legend for node
+    legend_elements = []
+    if node_data is not None:
+        for i, column in enumerate(node_data.columns[1:]):
+            legend_elements.append(
+                Patch(facecolor=colors[i], edgecolor=colors[i], label=column)
+            )
+    ax.legend(handles=legend_elements,
+              loc='lower left', bbox_to_anchor=(0, 1.02, 1, 0.1),
+              borderaxespad=0, ncols=5, mode='expand', frameon=False)
+
+    # get edge weights and plot edges with label
+    if weight_show:
+        if weight_show_style == 0:
+            nx.draw_networkx_edge_labels(
+                T, pos, edge_labels={(u, v): d["weight"] for u, v, d in T.edges(data=True)})
+        elif weight_show_style == 1:
+            nx.draw_networkx_edge_labels(
+                T, pos, edge_labels={(u, v): d["weight"] * "|" for u, v, d in T.edges(data=True)}
+            )
+        else:
+            raise ValueError('Unknown weight show style: {}'.format(weight_show_style))
+    nx.draw_networkx_edges(T, pos, edge_color=[d["color"] for u, v, d in T.edges(data=True)])
+
+    # hide axis
+    ax.set_axis_off()
 
     return ax
