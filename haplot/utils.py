@@ -3,6 +3,12 @@
 # @Author  : LXD
 # @Email   : lxd1997xy@163.com
 # @File    : utils.py
+from abc import ABC
+
+import numpy as np
+from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
+from matplotlib.lines import Line2D
+from matplotlib.text import Text
 
 
 def adjust_text(texts, ax):
@@ -35,3 +41,51 @@ def text_fit_patch(text, patch, ax):
     while text_width > patch_width and font_size > 1:
         font_size -= 1
         text.set_fontsize(font_size)
+
+
+class AnchoredSizeLegend(AnchoredOffsetbox, ABC):
+    def __init__(self,
+                 size,
+                 label,
+                 label_size=10,
+                 *args,
+                 **kwargs):
+        """
+        Draw a size legend with given size in points.
+
+        Parameters
+        ----------
+        :param size: a list of size in points
+        :param label: a list of label
+        :param label_size: font size of label
+        :param args: other args of AnchoredOffsetbox
+        :param kwargs: other kwargs of AnchoredOffsetbox
+        """
+        # self.box = AuxTransformBox(transform)
+        self.box = DrawingArea(300, 100, 0, 0)
+
+        if isinstance(size, int):
+            size = np.sqrt([size])
+        else:
+            size = np.sqrt(size)
+
+        if isinstance(label, str):
+            label = [label]
+
+        for i in range(len(size)):
+            x, y = 0, (size[i] - size[0]) / 2
+            self.box.add_artist(
+                Line2D([x], [y], marker='o', color='w',
+                       markerfacecolor='none',
+                       markeredgecolor='tab:red',
+                       markersize=size[i])
+            )
+            self.box.add_artist(
+                Line2D([0, size[i]], [size[i] / 2 + y, size[i] / 2 + y], color="tab:red")
+            )
+            self.box.add_artist(
+                Text(size[i], size[i] / 2 + y,
+                     label[i], size=label_size,
+                     color='k', ha="left", va="center")
+            )
+        super().__init__(*args, child=self.box, **kwargs)
