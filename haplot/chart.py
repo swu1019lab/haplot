@@ -802,7 +802,7 @@ def HapNetworkPlot(
         weight_show_style: int = 0,
         ax: axes.Axes = None):
     """
-    Plot haplotype network.
+    Plot haplotype network using minimum spanning tree.
 
     Parameters
     ----------
@@ -814,6 +814,7 @@ def HapNetworkPlot(
     :param weight_show: whether to show weight of edges
     :param weight_show_style: 0 for number, 1 for symbol with "|"
     :param ax: axes object to plot on (default: None)
+    :return: axes object
     """
     # get axes object
     if ax is None:
