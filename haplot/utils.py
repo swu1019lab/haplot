@@ -61,9 +61,6 @@ class AnchoredSizeLegend(AnchoredOffsetbox, ABC):
         :param args: other args of AnchoredOffsetbox
         :param kwargs: other kwargs of AnchoredOffsetbox
         """
-        # self.box = AuxTransformBox(transform)
-        self.box = DrawingArea(300, 100, 0, 0)
-
         if isinstance(size, int):
             size = np.sqrt([size])
         else:
@@ -72,19 +69,22 @@ class AnchoredSizeLegend(AnchoredOffsetbox, ABC):
         if isinstance(label, str):
             label = [label]
 
+        # self.box = AuxTransformBox(transform)
+        self.box = DrawingArea(np.max(size) * 2.2, np.max(size) * 1.2, 0, 0)
+
         for i in range(len(size)):
-            x, y = 0, (size[i] - size[0]) / 2
+            x, y = np.max(size) / 2, size[i] / 2
             self.box.add_artist(
                 Line2D([x], [y], marker='o', color='w',
                        markerfacecolor='none',
-                       markeredgecolor='tab:red',
+                       markeredgecolor='k',
                        markersize=size[i])
             )
             self.box.add_artist(
-                Line2D([0, size[i]], [size[i] / 2 + y, size[i] / 2 + y], color="tab:red")
+                Line2D([x, x + size[i]], [size[i], size[i]], color="k")
             )
             self.box.add_artist(
-                Text(size[i], size[i] / 2 + y,
+                Text(x + size[i], size[i],
                      label[i], size=label_size,
                      color='k', ha="left", va="center")
             )
