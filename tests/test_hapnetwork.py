@@ -17,28 +17,28 @@ node_name = ['Hap{}'.format(i + 1) for i in range(node_num)]
 node_data = pd.DataFrame(
     {
         'node': node_name,
-        'value1': np.random.randint(1, 400, node_num),
-        'value2': np.random.randint(1, 400, node_num),
-        'value3': np.random.randint(1, 400, node_num)
+        'value1': np.random.randint(1, 300, node_num),
+        'value2': np.random.randint(1, 300, node_num),
+        'value3': np.random.randint(1, 300, node_num)
     }
 )
 edge_data = pd.DataFrame(
     {
         'source': np.random.choice(node_name, edge_num),
         'target': np.random.choice(node_name, edge_num),
-        'weight': np.random.randint(1, 10, edge_num),
+        # weight is used to determine the difference between haplotypes
+        'weight': np.random.randint(1, 6, edge_num),
         'color': ['C7'] * edge_num
     }
 )
 
-print(node_data)
 # plot
-fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+fig, ax = plt.subplots(figsize=(5, 5))
 HapNetworkPlot(edge_data=edge_data,
                node_data=node_data,
                layout='spring',
                colors=['#595959', '#0F86FD', '#A6D08B'],
                node_font_size=8,
                ax=ax)
-# plt.tight_layout()
+plt.tight_layout()
 plt.show()
