@@ -864,24 +864,24 @@ def HapNetworkPlot(
                            marker=np.append(vertices, [[0, 0]], axis=0),
                            linewidths=0,
                            zorder=2)
-    # add legend for different types within same node
-    legend_elements = []
-    if node_data is not None:
+
+        # add legend for different node size
         loc = mpl.ticker.MaxNLocator(nbins=2)
         node_size_label = loc.tick_values(min(node_size), max(node_size))
-        # add legend for different node size
         asl = AnchoredSizeLegend(
             node_size_label[1:],
             node_size_label[1:],
             label_size=6,
             loc='lower left',
-            bbox_to_anchor=(.9, 0., 0.1, 1),
+            bbox_to_anchor=(1.02, 0., 0.1, 1),
             bbox_transform=ax.transAxes,
             pad=0.1, borderpad=0.5,
             frameon=False
         )
         ax.add_artist(asl)
 
+        # add legend for different types within same node
+        legend_elements = []
         for i, column in enumerate(node_data.columns[1:]):
             legend_elements.append(
                 Patch(facecolor=colors[i], edgecolor=colors[i], label=column)
