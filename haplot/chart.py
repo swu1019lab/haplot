@@ -874,7 +874,9 @@ def HapNetworkPlot(
             node_size_label[1:],
             node_size_label[1:],
             label_size=6,
-            loc='center left',
+            loc='lower left',
+            bbox_to_anchor=(.9, 0., 0.1, 1),
+            bbox_transform=ax.transAxes,
             pad=0.1, borderpad=0.5,
             frameon=False
         )
