@@ -6,6 +6,7 @@ A set of easy-to-use plot functions can be used for genomic visual analysis
 - [x] manhattan and qq plot
 - [x] LD heatmap plot
 - [x] haplotype geographic distribution plot
+- [x] haplotype network plot
 - [x] gene structure plot
 - [x] haplotype boxplot
 - [x] nucleotide diversity and Fst plot
@@ -17,4 +18,5 @@ haplot support python >= 3.10, with following packages installed:
 - matplotlib >= 3.6.2
 - scipy >= 1.9.3
 - geopandas >= 0.13.2
+- networkx >= 3.1
 
