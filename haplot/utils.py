@@ -81,7 +81,7 @@ class AnchoredSizeLegend(AnchoredOffsetbox, ABC):
                        markersize=size[i])
             )
             self.box.add_artist(
-                Line2D([x, x + size[i]], [size[i], size[i]], color="k")
+                Line2D([x, x + size[i]], [size[i], size[i]], color="k", linewidth=1)
             )
             self.box.add_artist(
                 Text(x + size[i], size[i],
