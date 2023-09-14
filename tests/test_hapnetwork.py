@@ -12,7 +12,7 @@ from haplot.chart import HapNetworkPlot
 # generate data for network plot
 np.random.seed(20230831)
 node_num = 10
-edge_num = 20
+edge_num = 40
 node_name = ['Hap{}'.format(i + 1) for i in range(node_num)]
 node_data = pd.DataFrame(
     {
@@ -27,15 +27,16 @@ edge_data = pd.DataFrame(
         'source': np.random.choice(node_name, edge_num),
         'target': np.random.choice(node_name, edge_num),
         # weight is used to determine the difference between haplotypes
-        'weight': np.random.randint(1, 6, edge_num),
+        'weight': np.random.randint(1, 10, edge_num),
         'color': ['C7'] * edge_num
     }
 )
 
 # plot
-fig, ax = plt.subplots(figsize=(5, 5))
+fig, ax = plt.subplots(figsize=(9, 3.83))
 HapNetworkPlot(edge_data=edge_data,
                node_data=node_data,
+               weight_show_style=1,
                layout='spring',
                colors=['#595959', '#0F86FD', '#A6D08B'],
                node_font_size=8,
