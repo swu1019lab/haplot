@@ -33,5 +33,5 @@ data = pd.DataFrame({
 
 fig, ax = plt.subplots(figsize=(10, 5), subplot_kw={'projection': ccrs.PlateCarree()})
 ax.stock_img()
-GeoMapPlot(data, value_col=[2, 3, 4])
+GeoMapPlot(data, value_col=[2, 3, 4], colors=['#AFD9F4', '#029492', '#69B2E2'], ax=ax)
 plt.show()
