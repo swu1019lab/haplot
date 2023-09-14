@@ -10,6 +10,7 @@ A set of easy-to-use plot functions can be used for genomic visual analysis
 - [x] gene structure plot
 - [x] haplotype boxplot
 - [x] nucleotide diversity and Fst plot
+- [x] gene structure with haplotype plot
 
 ## Dependencies
 haplot support python >= 3.10, with following packages installed:
