@@ -10,8 +10,8 @@ import pandas as pd
 from scipy import stats
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib import figure, axes, ticker
-from matplotlib.patches import RegularPolygon, Patch, Rectangle, FancyArrowPatch
+from matplotlib import figure, axes, ticker, transforms
+from matplotlib.patches import RegularPolygon, Patch, Rectangle, FancyArrowPatch, ConnectionPatch
 from matplotlib.lines import Line2D
 from matplotlib.collections import PatchCollection, LineCollection
 from matplotlib.transforms import Affine2D
@@ -82,11 +82,12 @@ def ManhattanPlot(
         threshold0: float = None,
         threshold1: float = None,
         chr_names: list | str = None,
+        chr_units: float = 1e-6,
         value_layout: str = 'stack',
         log: bool = False,
         colors: list = None,
         style: str = 'line',
-        fig: figure.Figure = None):
+        ax: axes.Axes = None):
     """
     Manhattan plot
 
@@ -107,29 +108,35 @@ def ManhattanPlot(
     :param threshold0: threshold for significant p-value
     :param threshold1: threshold for extremely significant p-value
     :param chr_names: list of chromosome names selected to plot
+    :param chr_units: unit of chromosome length, default 1e-6, unit is Mb
     :param value_layout: {'stack', 'overlay'}, default 'stack', layout of value
     :param log: whether to plot -log10(value)
     :param colors: list of colors for each chromosome
     :param style: {'line', 'scatter'}, default 'line', style of plot
-    :param fig: matplotlib figure object
+    :param ax: a matplotlib.axes.Axes object
     :return: matplotlib figure object
     """
+    # sort data by chromosome and position
+    new_df = df.sort_values(by=[df.columns[chr_col], df.columns[pos_col]])
+    new_df.dropna(inplace=True, how='any', subset=[df.columns[chr_col], df.columns[pos_col]])
+    new_df.reset_index(drop=True, inplace=True)
+
     # filter data
     if chr_names is not None:
         if isinstance(chr_names, str):
             chr_names = [chr_names]
-        df = df.loc[df.iloc[:, chr_col].isin(chr_names), :]
+        new_df = new_df.loc[new_df.iloc[:, chr_col].isin(chr_names), :]
 
     # transform xdata
-    xdata = df.iloc[:, [chr_col, pos_col]]
+    xdata = new_df.iloc[:, [chr_col, pos_col]]
     xdata.columns = ['chr', 'ps']
     xdata.set_index('chr', inplace=True)
-    xdata = xdata.transform(lambda x: x * 1e-6)
+    xdata = xdata.transform(lambda x: x * chr_units)
 
     # transform ydata
     if isinstance(value_col, int):
         value_col = [value_col]
-    ydata = df.iloc[:, value_col].to_numpy()
+    ydata = new_df.iloc[:, value_col].to_numpy()
 
     if log:
         ydata = -np.log10(ydata)
@@ -137,7 +144,7 @@ def ManhattanPlot(
     # transform annotation
     if ann_col is not None:
         # drop empty rows if values are NA in all annotation columns
-        ann_data = df.iloc[:, ann_col].dropna(how='all')
+        ann_data = new_df.iloc[:, ann_col].dropna(how='all')
     else:
         ann_data = None
 
@@ -158,44 +165,43 @@ def ManhattanPlot(
     # transform x loci based on cum sum of chromosome length
     xdata_new = pd.concat([group + chr_start.loc[name] for name, group in xdata.groupby(level=0)])
 
-    # get figure object
-    if fig is None:
-        fig = plt.gcf()
+    # get axes object
+    if ax is None:
+        ax = plt.gca()
 
     # create GridSpec object
     if value_layout == 'stack':
-        gs = fig.add_gridspec(len(value_col), 1)
-        ax = [fig.add_subplot(gs[i, 0]) for i in range(len(value_col))]
+        ax_divider = make_axes_locatable(ax)
+        axs = [ax] + [ax_divider.append_axes("bottom", size="100%", pad=0.5, sharex=ax) for _ in
+                      range(len(value_col) - 1)]
     elif value_layout == 'overlay':
-        gs = fig.add_gridspec(1, 1)
-        ax_ = fig.add_subplot(gs[0, 0])
-        ax = [ax_ for _ in range(len(value_col))]
+        axs = [ax] * len(value_col)
     else:
         raise ValueError('value_layout must be "stack" or "overlay"')
     # add plot
     for i in range(len(value_col)):
-        ax[i].set_title(df.columns[value_col[i]])
+        axs[i].set_title(new_df.columns[value_col[i]])
 
         if style == 'scatter' and value_layout == 'stack':
-            ax[i].scatter(xdata_new.to_numpy().flatten(), ydata[:, i], color=cdata, s=0.5)
+            axs[i].scatter(xdata_new.to_numpy().flatten(), ydata[:, i], color=cdata, s=0.5)
         elif style == 'scatter' and value_layout == 'overlay':
-            ax[i].scatter(xdata_new.to_numpy().flatten(), ydata[:, i], s=0.5)
+            axs[i].scatter(xdata_new.to_numpy().flatten(), ydata[:, i], s=0.5)
         elif style == 'line' and value_layout == 'stack':
-            ax[i].vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=cdata, linewidth=0.5)
+            axs[i].vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=cdata, linewidth=0.5)
         elif style == 'line' and value_layout == 'overlay':
-            ax[i].vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=next(colors), linewidth=0.5)
+            axs[i].vlines(xdata_new.to_numpy().flatten(), 0, ydata[:, i], color=next(colors), linewidth=0.5)
         else:
             raise ValueError('style must be "line" or "scatter"')
 
         if i != len(value_col) - 1:
-            ax[i].set_xticks([])
+            axs[i].set_xticks([])
         else:
-            ax[i].set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
+            axs[i].set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
 
         if threshold0 is not None:
-            ax[i].axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
+            axs[i].axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
         if threshold1 is not None:
-            ax[i].axhline(-np.log10(threshold1), color='gray', linewidth=0.5)
+            axs[i].axhline(-np.log10(threshold1), color='gray', linewidth=0.5)
 
         # add annotation
         if ann_data is not None:
@@ -204,7 +210,7 @@ def ManhattanPlot(
             ann_y = ydata[ann_index, i]
             # add an annotation for each point
             for xi, yi, text in zip(ann_x, ann_y, ann_data.to_numpy()):
-                ax[i].annotate(
+                axs[i].annotate(
                     text,
                     xy=(xi, yi), xycoords='data',
                     xytext=(30, 10), textcoords='offset points',
@@ -212,7 +218,7 @@ def ManhattanPlot(
                     bbox=dict(boxstyle="round", fc="w"),
                     arrowprops=dict(arrowstyle="->", fc="C0", ec="C0", lw=0.5)
                 )
-    return fig
+    return ax
 
 
 def QQPlot(
@@ -232,24 +238,14 @@ def QQPlot(
     if ax is None:
         ax = plt.gca()
 
-    p = df.iloc[:, value_col]
+    p = df.iloc[:, value_col].dropna().to_numpy()
     # return two tuple: (osm, osr), (slope, intercept, r)
     # 1st tuple contains two arrays:
     # first is theoretical quantiles, second is sample quantiles
     res = stats.probplot(p, dist=stats.uniform)
     osm, osr = res[0]
     ax.scatter(-np.log10(osm), -np.log10(osr), c='k', s=5)
-    # slope, intercept, r = res[1]
-    reg = stats.linregress(-np.log10(osm), -np.log10(osr))
-    ax.plot(-np.log10(osm), -np.log10(osm) * reg[0] + reg[1], 'b--')
-    # calculate confidence interval for linear regression
-    x = -np.log10(osm)
-    y = -np.log10(osm) * reg[0] + reg[1]
-    std = x.std()
-    mean = x.mean()
-    n = len(x)
-    y_err = std * np.sqrt(1 / n + (x - mean) ** 2 / np.sum((x - mean) ** 2))
-    ax.fill_between(x, y - y_err, y + y_err, alpha=0.2)
+    ax.plot(-np.log10(osm), -np.log10(osm), 'b--')
     return ax
 
 
@@ -369,6 +365,7 @@ def GeoMapPlot(df: pd.DataFrame,
                lon_col: int = 0,
                lat_col: int = 1,
                value_col: int | list = 2,
+               colors: list = None,
                map_file: str = None,
                bound_file: str = None,
                ax: axes.Axes = None):
@@ -381,6 +378,7 @@ def GeoMapPlot(df: pd.DataFrame,
     :param lon_col: column index of longitude
     :param lat_col: column index of latitude
     :param value_col: column index of value
+    :param colors: a list of colors
     :param map_file: map file path, should be a shapefile or a geojson file or json file
     :param bound_file: boundary file path, should be a shapefile or a geojson file or json file
     :param ax: matplotlib axes object
@@ -416,7 +414,7 @@ def GeoMapPlot(df: pd.DataFrame,
 
     # scatter plot using pie shape marker to show the percentage of each value
     # https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Wedge.html#matplotlib.patches.Wedge
-    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color'] if colors is None else colors
     for i in range(value_percent.shape[0]):
         for j in range(value_percent.shape[1]):
             theta = 2 * np.pi * np.linspace(value_percent[i, j - 1] if j > 0 else 0, value_percent[i, j], 100)
@@ -428,16 +426,30 @@ def GeoMapPlot(df: pd.DataFrame,
     # add the legend for different values
     legend = ax.legend(
         handles=[Patch(color=colors[i], label=l) for i, l in enumerate(df.iloc[:, value_col].columns)],
-        loc="upper left", bbox_to_anchor=(1, 0, 0.1, 1), borderaxespad=0,
-        title="Values", frameon=False
+        loc='lower left', bbox_to_anchor=(0, 1.01, 1, 0.1),
+        borderaxespad=0, ncols=3, mode='expand', frameon=False
     )
     ax.add_artist(legend)
 
     # produce a legend with a cross-section of sizes from the scatter
-    handles, labels = scatter.legend_elements(prop="sizes", num=5, markeredgecolor='m', markerfacecolor='w')
-    ax.legend(handles, labels,
-              loc="lower left", bbox_to_anchor=(1, 0, 0.1, 1), borderaxespad=0,
-              title="Sizes", frameon=False)
+    # add legend for different node size
+    loc = mpl.ticker.MaxNLocator(nbins=3)
+    size_label = loc.tick_values(min(value_sum), max(value_sum))
+    asl = AnchoredSizeLegend(
+        size_label[1:],
+        size_label[1:],
+        label_size=5,
+        loc='center',
+        bbox_to_anchor=(0, 0, 0.2, 0.5),
+        bbox_transform=ax.transAxes,
+        pad=0.1, borderpad=0.5,
+        frameon=False
+    )
+    ax.add_artist(asl)
+    # handles, labels = scatter.legend_elements(prop="sizes", num=5, markeredgecolor='m', markerfacecolor='w')
+    # ax.legend(handles, labels,
+    #           loc="center", bbox_to_anchor=(0, 0, 0.1, 0.5), borderaxespad=0,
+    #           title="Sizes", frameon=False)
 
     return ax
 
@@ -695,10 +707,11 @@ def GeneStrucPlot(
     # scale data
     x_min = df.iloc[:, start_col].min()
     x_max = df.iloc[:, end_col].max()
-    df.iloc[:, [start_col, end_col]] = (df.iloc[:, [start_col, end_col]] - x_min) / (x_max - x_min)
+    new_df = df.copy()
+    new_df.iloc[:, [start_col, end_col]] = (df.iloc[:, [start_col, end_col]] - x_min) / (x_max - x_min)
 
     # plot gene structure
-    for name, group in df.groupby(df.columns[gene_col]):
+    for name, group in new_df.groupby(new_df.columns[gene_col]):
         # get gene strand
         gene_strand = group.iloc[0, strand_col]
         # get gene start and end
@@ -762,7 +775,7 @@ def GeneStrucPlot(
                                      edgecolor=feature_config['color'],
                                      label=feature_type))
     ax.legend(handles=legend_elements,
-              loc='upper left', bbox_to_anchor=(0, -0.02, 1, 0.1),
+              loc='lower left', bbox_to_anchor=(0, 1.3, 1, 0.1),
               borderaxespad=0, ncols=5, mode='expand', frameon=False)
     # set x-axis
     ax_twin = ax.twiny()
@@ -789,7 +802,7 @@ def GeneStrucPlot(
     # Hide these grid behind plot objects
     ax_twin.set_axisbelow(True)
 
-    return ax
+    return ax_twin
 
 
 def HapNetworkPlot(
@@ -908,3 +921,148 @@ def HapNetworkPlot(
     ax.set_axis_off()
 
     return ax
+
+
+def HeatmapPlot(num_data: np.ndarray,
+                texts_data: np.ndarray = None,
+                xticklabels: list = None,
+                yticklabels: list = None,
+                plot_cbar: bool = False,
+                plot_grid: bool = False,
+                ax: axes.Axes = None):
+    """
+    Plot heatmap.
+
+    Parameters
+    ----------
+    :param num_data: an array with numerical data for heatmap
+    :param texts_data: an array with text data for annotation, the size of texts_data should be the same as num_data
+    :param xticklabels: a list of x tick labels
+    :param yticklabels: a list of y tick labels
+    :param plot_cbar: whether to plot color bar
+    :param plot_grid: whether to plot grid
+    :param ax: axes object to plot on (default: None)
+    """
+    # get axes object
+    if ax is None:
+        ax = plt.gca()
+
+    # plot data
+    cmap = mpl.colormaps['PuBu'].resampled(3)
+    ax.imshow(num_data, cmap=cmap, aspect='auto', vmin=0, vmax=2)
+    # add texts
+    if texts_data is not None:
+        for i in range(num_data.shape[0]):
+            for j in range(num_data.shape[1]):
+                ax.text(j, i, texts_data[i, j], ha='center', va='center', color='white')
+    # add ColorBar
+    if plot_cbar:
+        cax = ax.inset_axes([1.04, 0.2, 0.03, 0.6])
+        bounds = [0, 1, 2, 3]
+        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+        cbar = ax.figure.colorbar(
+            mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
+            ax=ax,
+            cax=cax,
+            boundaries=bounds,
+        )
+        cbar.set_ticks([0.5, 1.5, 2.5], labels=['0', '1', '2'])
+        # hide color bar ticks
+        cbar.ax.tick_params(size=0)
+    # add x ticks
+    if xticklabels is not None:
+        ax.set_xticks(np.arange(len(xticklabels)), labels=xticklabels)
+    # add y ticks
+    if yticklabels is not None:
+        ax.set_yticks(np.arange(len(yticklabels)), labels=yticklabels)
+    ax.tick_params(bottom=False, labelbottom=False, left=False)
+    # hide spines
+    ax.spines[:].set_visible(False)
+    # add grid
+    if plot_grid:
+        ax.set_xticks(np.arange(num_data.shape[1] + 1) - .5, minor=True)
+        ax.set_yticks(np.arange(num_data.shape[0] + 1) - .5, minor=True)
+        ax.grid(which='minor',
+                linestyle='-',
+                color='w',
+                linewidth=1)
+        ax.tick_params(which='minor', bottom=False, left=False)
+
+    return ax
+
+
+def GeneWithHapHeatmap(df1: pd.DataFrame,
+                       df2: pd.DataFrame,
+                       fig: plt.Figure = None):
+    """
+    Plot gene structure and genotype heatmap.
+
+    Parameters
+    ----------
+    :param df1: a dataFrame with gene structure data
+    :param df2: a dataFrame with genotype data, columns are a multiIndex with two levels (chrom, pos)
+    :param fig: figure object to plot on (default: None)
+    """
+    # get figure object
+    if fig is None:
+        fig = plt.gcf()
+
+    # create GridSpec with two axes
+    gs = fig.add_gridspec(3, 1, height_ratios=[1, 3, 1], hspace=0.1)
+    ax1 = fig.add_subplot(gs[0])
+    cax = GeneStrucPlot(df1, ax=ax1)
+    ax2 = fig.add_subplot(gs[1])
+    HeatmapPlot(df2.values, yticklabels=df2.index.to_list(), plot_cbar=True, ax=ax2)
+    ax3 = fig.add_subplot(gs[2])
+    # convert a multiIndex to a numpy array
+    texts_data = np.row_stack([df2.columns.get_level_values(i) for i in range(2, df2.columns.nlevels)])
+    HeatmapPlot(
+        np.ones((df2.columns.nlevels - 2, len(df2.columns))),
+        texts_data=texts_data,
+        yticklabels=df2.columns.names[2:],
+        plot_grid=True,
+        ax=ax3
+    )
+
+    # connect two axes with connection patch
+    pos = df2.columns.get_level_values(1).to_numpy()
+    points0 = [(i, .3) for i in pos]
+    points1 = [(i, 0) for i in pos]
+    points2 = [(i, 1) for i in range(len(pos))]
+
+    transA = transforms.blended_transform_factory(cax.transData, cax.transAxes)
+    transB = transforms.blended_transform_factory(ax2.transData, ax2.transAxes)
+    if len(points1) == len(points2):
+        for i in range(len(points1)):
+            fig.add_artist(
+                ConnectionPatch(
+                    xyA=points0[i],
+                    xyB=points1[i],
+                    coordsA=transA,
+                    coordsB=transA,
+                    axesA=cax,
+                    axesB=cax,
+                    arrowstyle="-",
+                    color="darkred",
+                    linestyle="--",
+                    linewidth=0.5,
+                    zorder=0.1
+                )
+            )
+            fig.add_artist(
+                ConnectionPatch(
+                    xyA=points1[i],
+                    xyB=points2[i],
+                    coordsA=transA,
+                    coordsB=transB,
+                    axesA=cax,
+                    axesB=ax2,
+                    arrowstyle="-",
+                    color="darkred",
+                    linewidth=0.5,
+                )
+            )
+    else:
+        raise ValueError('Length of points1 and points2 are not equal.')
+
+    return fig
