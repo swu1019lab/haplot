@@ -127,22 +127,17 @@ class ManhattanTheme(object):
         return self.apply(*args, **kwargs)
 
     @staticmethod
-    def apply(fig: figure.Figure = None):
-        if fig is None:
-            fig = plt.gcf()
+    def apply(ax: axes.Axes = None):
+        if ax is None:
+            ax = plt.gca()
 
-        if len(fig.axes) == 0:
-            print("No axes in figure.")
-            return fig
-        else:
-            for ax in fig.axes:
-                Theme.apply(ax)
-                ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
-                ax.set_xmargin(0.01)
-                ax.set_ylim(bottom=0, top=None)
-            fig.axes[-1].set_xlabel("Chromosome")
-            fig.axes[-1].tick_params(axis='x', rotation=0)
-        return fig
+        Theme.apply(ax)
+        ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
+        ax.set_xmargin(0.01)
+        ax.set_ylim(bottom=0, top=None)
+        ax.set_xlabel("Chromosome")
+        ax.tick_params(axis='x', rotation=0)
+        return ax
 
 
 class QQTheme(object):
