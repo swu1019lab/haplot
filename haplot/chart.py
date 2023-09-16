@@ -1025,7 +1025,8 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
     )
 
     # connect two axes with connection patch
-    pos = df2.columns.get_level_values(1).to_numpy()
+    # chromosome position must be int number
+    pos = df2.columns.get_level_values(1).to_numpy(dtype=np.int64)
     points0 = [(i, .3) for i in pos]
     points1 = [(i, 0) for i in pos]
     points2 = [(i, 1) for i in range(len(pos))]
