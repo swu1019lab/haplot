@@ -924,21 +924,28 @@ def HapNetworkPlot(
 
 
 def HeatmapPlot(num_data: np.ndarray,
-                texts_data: np.ndarray = None,
-                xticklabels: list = None,
-                yticklabels: list = None,
+                txt_data: np.ndarray = None,
+                cmap: str = 'PuBu',
+                xlabel: str = None,
+                ylabel: str = None,
+                row_labels: list = None,
+                col_labels: list = None,
                 plot_cbar: bool = False,
                 plot_grid: bool = False,
-                ax: axes.Axes = None):
+                ax: axes.Axes = None,
+                **kwargs):
     """
     Plot heatmap.
 
     Parameters
     ----------
     :param num_data: an array with numerical data for heatmap
-    :param texts_data: an array with text data for annotation, the size of texts_data should be the same as num_data
-    :param xticklabels: a list of x tick labels
-    :param yticklabels: a list of y tick labels
+    :param txt_data: an array with text data for annotation, the size of texts_data should be the same as num_data
+    :param cmap: colormap used in matplotlib
+    :param xlabel: x label of axis
+    :param ylabel: y label of axis
+    :param row_labels: a list of row labels
+    :param col_labels: a list of col labels
     :param plot_cbar: whether to plot color bar
     :param plot_grid: whether to plot grid
     :param ax: axes object to plot on (default: None)
@@ -948,18 +955,22 @@ def HeatmapPlot(num_data: np.ndarray,
         ax = plt.gca()
 
     # plot data
-    cmap = mpl.colormaps['PuBu'].resampled(3)
-    ax.imshow(num_data, cmap=cmap, aspect='auto', vmin=0, vmax=2)
+    cmap = mpl.colormaps[cmap].resampled(3)
+    im = ax.imshow(num_data, cmap=cmap, aspect='auto', vmin=0, vmax=2, **kwargs)
     # add texts
-    if texts_data is not None:
+    threshold = im.norm(np.max(num_data)) / 2
+    txt_colors = ['black', 'white']
+    if txt_data is not None:
         for i in range(num_data.shape[0]):
             for j in range(num_data.shape[1]):
-                ax.text(j, i, texts_data[i, j], ha='center', va='center', color='white')
+                ax.text(j, i, txt_data[i, j],
+                        ha='center', va='center',
+                        color=txt_colors[int(im.norm(num_data[i, j]) > threshold)])
     # add ColorBar
     if plot_cbar:
         cax = ax.inset_axes([1.04, 0.2, 0.03, 0.6])
         bounds = [0, 1, 2, 3]
-        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+        norm = mpl.colors.BoundaryNorm(bounds, 3)
         cbar = ax.figure.colorbar(
             mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
             ax=ax,
@@ -969,13 +980,19 @@ def HeatmapPlot(num_data: np.ndarray,
         cbar.set_ticks([0.5, 1.5, 2.5], labels=['0', '1', '2'])
         # hide color bar ticks
         cbar.ax.tick_params(size=0)
-    # add x ticks
-    if xticklabels is not None:
-        ax.set_xticks(np.arange(len(xticklabels)), labels=xticklabels)
-    # add y ticks
-    if yticklabels is not None:
-        ax.set_yticks(np.arange(len(yticklabels)), labels=yticklabels)
-    ax.tick_params(bottom=False, labelbottom=False, left=False)
+    # add x, y label of axis
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    # add column labels
+    ax.set_xticklabels([])
+    if col_labels is not None:
+        ax.set_xticks(np.arange(len(col_labels)), labels=col_labels)
+    # add row labels
+    ax.set_yticklabels([])
+    if row_labels is not None:
+        ax.set_yticks(np.arange(len(row_labels)), labels=row_labels)
+    # hide ticks
+    ax.tick_params(bottom=False, left=False)
     # hide spines
     ax.spines[:].set_visible(False)
     # add grid
@@ -993,6 +1010,7 @@ def HeatmapPlot(num_data: np.ndarray,
 
 def GeneWithHapHeatmap(df1: pd.DataFrame,
                        df2: pd.DataFrame,
+                       cmap: str = 'PuBu',
                        fig: plt.Figure = None):
     """
     Plot gene structure and genotype heatmap.
@@ -1001,29 +1019,44 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
     ----------
     :param df1: a dataFrame with gene structure data
     :param df2: a dataFrame with genotype data, columns are a multiIndex with two levels (chrom, pos)
+    :param cmap: colormap used in matplotlib, e.g., Oranges, Reds, viridis, PuRd, PuBu, PuBuGn, ...
     :param fig: figure object to plot on (default: None)
     """
     # get figure object
     if fig is None:
         fig = plt.gcf()
 
-    # create GridSpec with two axes
-    gs = fig.add_gridspec(3, 1, height_ratios=[1, 3, 1], hspace=0.1)
+    # create GridSpec with four axes
+    gs = fig.add_gridspec(4, 1, height_ratios=[1, 3, 1, 1], hspace=0.1)
     ax1 = fig.add_subplot(gs[0])
-    cax = GeneStrucPlot(df1, ax=ax1)
     ax2 = fig.add_subplot(gs[1])
-    HeatmapPlot(df2.values, yticklabels=df2.index.to_list(), plot_cbar=True, ax=ax2)
     ax3 = fig.add_subplot(gs[2])
-    # convert a multiIndex to a numpy array
-    texts_data = np.row_stack([df2.columns.get_level_values(i) for i in range(2, df2.columns.nlevels)])
+    ax4 = fig.add_subplot(gs[3])
+    # plot gene structure
+    cax = GeneStrucPlot(df1, ax=ax1)
+    # plot genotype heatmap
+    HeatmapPlot(df2.values, cmap=cmap, row_labels=df2.index.to_list(), plot_cbar=True, ax=ax2)
+    # get ref and alt allele, e.g., A, T, G, C, AAAA, CCCC
+    ref_allele = df2.columns.get_level_values(2)
+    alt_allele = df2.columns.get_level_values(3)
+    ref_allele_df = pd.Series(ref_allele).str.split('', expand=True).iloc[:, 1:-1].T
     HeatmapPlot(
-        np.ones((df2.columns.nlevels - 2, len(df2.columns))),
-        texts_data=texts_data,
-        yticklabels=df2.columns.names[2:],
+        np.ones(ref_allele_df.shape),
+        txt_data=ref_allele_df.values,
+        cmap=cmap,
+        ylabel='Ref allele',
         plot_grid=True,
         ax=ax3
     )
-
+    alt_allele_df = pd.Series(alt_allele).str.split('', expand=True).iloc[:, 1:-1].T
+    HeatmapPlot(
+        np.ones(alt_allele_df.shape),
+        txt_data=alt_allele_df.values,
+        cmap=cmap,
+        ylabel="Alt allele",
+        plot_grid=True,
+        ax=ax4
+    )
     # connect two axes with connection patch
     # chromosome position must be int number
     pos = df2.columns.get_level_values(1).to_numpy(dtype=np.int64)
