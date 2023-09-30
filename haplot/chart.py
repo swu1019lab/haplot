@@ -8,6 +8,7 @@ from itertools import cycle
 import numpy as np
 import pandas as pd
 from scipy import stats
+
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import figure, axes, ticker, transforms
@@ -16,6 +17,7 @@ from matplotlib.lines import Line2D
 from matplotlib.collections import PatchCollection, LineCollection
 from matplotlib.transforms import Affine2D
 import matplotlib.pyplot as plt
+
 import geopandas as gpd
 import networkx as nx
 from haplot.utils import AnchoredSizeLegend
@@ -72,6 +74,107 @@ def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
 
     return ax
 
+def ScatterPlot(df: pd.DataFrame,
+                x_col: int = 0,
+                y_col: int = 1,
+                color_col: int = None,
+                size_col: int = None,
+                color: str = None,
+                size: float = None,
+                title: str = None,
+                x_label: str = None,
+                x_unit: float = 1e-6,
+                y_label: str = None,
+                log_y: bool = False,
+                plot_threshold: bool = False,
+                threshold0: float = None,
+                threshold1: float = None,
+                plot_cmap: bool = False,
+                cmap: any([str, 'Colormap']) = None,
+                ax: axes.Axes = None):
+    """
+    Scatter plot
+
+    Parameters
+    ----------
+    :param df: a dataframe with at least two columns: 'x' and 'y'
+    :param x_col: column index of x
+    :param y_col: column index of y
+    :param color_col: column index of color
+    :param size_col: column index of size
+    :param color: color of scatter
+    :param size: size of scatter
+    :param title: title of plot
+    :param x_label: label of x-axis
+    :param x_unit: unit of x-axis, default 1e-6, unit is Mb
+    :param y_label: label of y-axis
+    :param log_y: whether to plot log10(y)
+    :param plot_threshold: whether to plot threshold
+    :param threshold0:  for significant p-value
+    :param threshold1: threshold for extremely significant p-value
+    :param plot_cmap: whether to plot colormap for color_col
+    :param cmap: can be a string or a matplotlib colormap object
+    :param ax: matplotlib axes object
+    :return: matplotlib axes object
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    # get x and y data
+    x = df.iloc[:, x_col].to_numpy()
+    y = df.iloc[:, y_col].to_numpy()
+
+    # plot log10(y)
+    if log_y:
+        y = -np.log10(y)
+
+    # get color data
+    if color_col is not None:
+        c = df.iloc[:, color_col].to_numpy()
+    else:
+        c = color
+
+    # get size data
+    if size_col is not None:
+        s = df.iloc[:, size_col].to_numpy()
+    else:
+        s = size
+
+    # plot scatter
+    if plot_cmap:
+        if cmap is None:
+            cmap = 'Reds'
+        cmap = mpl.colormaps.get_cmap(cmap)
+        norm = mpl.colors.Normalize()
+        ax.scatter(x, y, c=c, s=s, cmap=cmap, norm=norm)
+        cax = ax.inset_axes([1.04, 0.2, 0.03, 0.6])
+        ax.figure.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, shrink=.5, label=r"$R^2$")
+    else:
+        ax.scatter(x, y, c=c, s=s)
+
+    # plot threshold
+    if plot_threshold:
+        if threshold0 is not None:
+            ax.axhline(threshold0, color='C0', linestyle='--', linewidth=.5)
+        if threshold1 is not None:
+            ax.axhline(threshold1, color='C1', linewidth=.5)
+
+    # set x ticks format
+    formatter = ticker.FuncFormatter(lambda i, pos: '{:.1f}'.format(i * x_unit))
+    ax.xaxis.set_major_formatter(formatter)
+
+    # set x and y label
+    if x_label is not None:
+        ax.set_xlabel(x_label)
+
+    if y_label is not None:
+        ax.set_ylabel(y_label)
+
+    # set title
+    if title is not None:
+        ax.set_title(title)
+
+    return ax
 
 def ManhattanPlot(
         df: pd.DataFrame,
@@ -82,6 +185,7 @@ def ManhattanPlot(
         threshold0: float = None,
         threshold1: float = None,
         chr_names: list | str = None,
+        chr_used: list = None,
         chr_units: float = 1e-6,
         value_layout: str = 'stack',
         log: bool = False,
@@ -107,14 +211,15 @@ def ManhattanPlot(
     :param ann_col: column index of annotation
     :param threshold0: threshold for significant p-value
     :param threshold1: threshold for extremely significant p-value
-    :param chr_names: list of chromosome names selected to plot
+    :param chr_names: list of chromosome names to replace the original names
+    :param chr_used: list of chromosome names used to plot
     :param chr_units: unit of chromosome length, default 1e-6, unit is Mb
     :param value_layout: {'stack', 'overlay'}, default 'stack', layout of value
     :param log: whether to plot -log10(value)
     :param colors: list of colors for each chromosome
     :param style: {'line', 'scatter'}, default 'line', style of plot
     :param ax: a matplotlib.axes.Axes object
-    :return: matplotlib figure object
+    :return: list of Axes objects
     """
     # sort data by chromosome and position
     new_df = df.sort_values(by=[df.columns[chr_col], df.columns[pos_col]])
@@ -122,10 +227,8 @@ def ManhattanPlot(
     new_df.reset_index(drop=True, inplace=True)
 
     # filter data
-    if chr_names is not None:
-        if isinstance(chr_names, str):
-            chr_names = [chr_names]
-        new_df = new_df.loc[new_df.iloc[:, chr_col].isin(chr_names), :]
+    if chr_used is not None:
+        new_df = new_df.loc[new_df.iloc[:, chr_col].isin(chr_used), :]
 
     # transform xdata
     xdata = new_df.iloc[:, [chr_col, pos_col]]
@@ -150,7 +253,8 @@ def ManhattanPlot(
 
     # set colors for each chromosome
     if colors is None:
-        colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+        # colors = cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+        colors = cycle(['skyblue', 'steelblue'])
     else:
         colors = cycle(colors)
     cdata = xdata.groupby(level=0, group_keys=False).apply(lambda x: x.assign(colors=next(colors))).iloc[:, -1]
@@ -161,6 +265,9 @@ def ManhattanPlot(
     # calculate chromosome center location
     chr_start = chr_len_new.cumsum() - chr_len_new
     chr_center = chr_start + chr_len_new / 2
+    chr_labels = chr_center.index.to_numpy()
+    if chr_names is not None and len(chr_names) == chr_center.shape[0]:
+        chr_labels = chr_names
 
     # transform x loci based on cum sum of chromosome length
     xdata_new = pd.concat([group + chr_start.loc[name] for name, group in xdata.groupby(level=0)])
@@ -172,7 +279,7 @@ def ManhattanPlot(
     # create GridSpec object
     if value_layout == 'stack':
         ax_divider = make_axes_locatable(ax)
-        axs = [ax] + [ax_divider.append_axes("bottom", size="100%", pad=0.5, sharex=ax) for _ in
+        axs = [ax] + [ax_divider.append_axes("bottom", size="100%", pad=0.8, sharex=ax) for _ in
                       range(len(value_col) - 1)]
     elif value_layout == 'overlay':
         axs = [ax] * len(value_col)
@@ -193,10 +300,7 @@ def ManhattanPlot(
         else:
             raise ValueError('style must be "line" or "scatter"')
 
-        if i != len(value_col) - 1:
-            axs[i].set_xticks([])
-        else:
-            axs[i].set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_center.index.to_list())
+        axs[i].set_xticks(chr_center.iloc[:, 0].to_numpy(), chr_labels)
 
         if threshold0 is not None:
             axs[i].axhline(-np.log10(threshold0), color='gray', linestyle='--', linewidth=0.5)
@@ -218,7 +322,7 @@ def ManhattanPlot(
                     bbox=dict(boxstyle="round", fc="w"),
                     arrowprops=dict(arrowstyle="->", fc="C0", ec="C0", lw=0.5)
                 )
-    return ax
+    return axs
 
 
 def QQPlot(
@@ -244,8 +348,8 @@ def QQPlot(
     # first is theoretical quantiles, second is sample quantiles
     res = stats.probplot(p, dist=stats.uniform)
     osm, osr = res[0]
-    ax.scatter(-np.log10(osm), -np.log10(osr), c='k', s=5)
-    ax.plot(-np.log10(osm), -np.log10(osm), 'b--')
+    ax.scatter(-np.log10(osm), -np.log10(osr), c='skyblue', s=5)
+    ax.plot(-np.log10(osm), -np.log10(osm), 'k--')
     return ax
 
 
@@ -308,6 +412,9 @@ def LDHeatmapPlot(
     ax.set_xlim(start * 0.5, stop - start * 0.5)
     ax.set_ylim(-0.1, (n - start) / 2 + 0.5 + 0.1)
 
+    # Turn axis off
+    ax.set_axis_off()
+
     # Add color bar
     cax = ax.inset_axes([0.8, 0.01, 0.03, 0.5])
     ax.figure.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, shrink=.5, label=r"$R^2$")
@@ -355,8 +462,7 @@ def LDHeatmapPlot(
         ax_snp.set_yticklabels([])
         ax_snp.spines.bottom.set_visible(False)
 
-    # Turn axis off
-    ax.set_axis_off()
+        return ax_snp
 
     return ax
 
@@ -705,8 +811,8 @@ def GeneStrucPlot(
         ax = plt.gca()
 
     # scale data
-    x_min = df.iloc[:, start_col].min()
-    x_max = df.iloc[:, end_col].max()
+    x_min = df.iloc[:, start_col].min() - 2000
+    x_max = df.iloc[:, end_col].max() + 2000
     new_df = df.copy()
     new_df.iloc[:, [start_col, end_col]] = (df.iloc[:, [start_col, end_col]] - x_min) / (x_max - x_min)
 
@@ -930,6 +1036,12 @@ def HeatmapPlot(num_data: np.ndarray,
                 ylabel: str = None,
                 row_labels: list = None,
                 col_labels: list = None,
+                row_grids: list = None,
+                col_grids: list = None,
+                row_labels_as_color: bool = False,
+                col_labels_as_color: bool = False,
+                plot_row_ticks: bool = False,
+                plot_col_ticks: bool = False,
                 plot_cbar: bool = False,
                 plot_grid: bool = False,
                 ax: axes.Axes = None,
@@ -946,6 +1058,12 @@ def HeatmapPlot(num_data: np.ndarray,
     :param ylabel: y label of axis
     :param row_labels: a list of row labels
     :param col_labels: a list of col labels
+    :param row_grids: a list of row grids
+    :param col_grids: a list of col grids
+    :param row_labels_as_color: whether to use row labels as color
+    :param col_labels_as_color: whether to use col labels as color
+    :param plot_row_ticks: whether to plot row ticks
+    :param plot_col_ticks: whether to plot col ticks
     :param plot_cbar: whether to plot color bar
     :param plot_grid: whether to plot grid
     :param ax: axes object to plot on (default: None)
@@ -954,13 +1072,16 @@ def HeatmapPlot(num_data: np.ndarray,
     if ax is None:
         ax = plt.gca()
 
+    # cmap = mpl.colormaps[cmap].resampled(3)
+    ax_divider = make_axes_locatable(ax)
+
     # plot data
-    cmap = mpl.colormaps[cmap].resampled(3)
     im = ax.imshow(num_data, cmap=cmap, aspect='auto', vmin=0, vmax=2, **kwargs)
     # add texts
     threshold = im.norm(np.max(num_data)) / 2
     txt_colors = ['black', 'white']
     if txt_data is not None:
+        txt_data = txt_data
         for i in range(num_data.shape[0]):
             for j in range(num_data.shape[1]):
                 ax.text(j, i, txt_data[i, j],
@@ -972,7 +1093,7 @@ def HeatmapPlot(num_data: np.ndarray,
         bounds = [0, 1, 2, 3]
         norm = mpl.colors.BoundaryNorm(bounds, 3)
         cbar = ax.figure.colorbar(
-            mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
+            mpl.cm.ScalarMappable(cmap=mpl.colormaps[cmap].resampled(3), norm=norm),
             ax=ax,
             cax=cax,
             boundaries=bounds,
@@ -984,26 +1105,58 @@ def HeatmapPlot(num_data: np.ndarray,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     # add column labels
-    ax.set_xticklabels([])
+    ax.set_xticks([])
     if col_labels is not None:
-        ax.set_xticks(np.arange(len(col_labels)), labels=col_labels)
+        if col_labels_as_color:
+            ax_col = ax_divider.append_axes("top", size="5%", pad="1%", sharex=ax)
+            # transform col labels to numerical data
+            codes, uniques = pd.Series(col_labels).factorize()
+            ax_col.imshow(codes.reshape(1, -1),
+                          cmap=mpl.colormaps[cmap].resampled(len(uniques)),
+                          aspect='auto')
+            ax_col.set_axis_off()
+        else:
+            ax.set_xticks(np.arange(len(col_labels)), labels=col_labels)
+
+        if not plot_col_ticks:
+            ax.tick_params(axis='x', which='both', bottom=False)
     # add row labels
-    ax.set_yticklabels([])
+    ax.set_yticks([])
     if row_labels is not None:
-        ax.set_yticks(np.arange(len(row_labels)), labels=row_labels)
-    # hide ticks
-    ax.tick_params(bottom=False, left=False)
+        if row_labels_as_color:
+            ax_row = ax_divider.append_axes("left", size="5%", pad="1%", sharey=ax)
+            # transform row labels to numerical data
+            codes, uniques = pd.Series(row_labels).factorize()
+            ax_row.imshow(codes.reshape(-1, 1),
+                          cmap=mpl.colormaps[cmap].resampled(len(uniques)),
+                          aspect='auto')
+            ax_row.set_axis_off()
+        else:
+            ax.set_yticks(np.arange(len(row_labels)), labels=row_labels)
+
+        if not plot_row_ticks:
+            ax.tick_params(axis='y', which='both', left=False)
+
     # hide spines
     ax.spines[:].set_visible(False)
     # add grid
     if plot_grid:
-        ax.set_xticks(np.arange(num_data.shape[1] + 1) - .5, minor=True)
-        ax.set_yticks(np.arange(num_data.shape[0] + 1) - .5, minor=True)
+        if row_grids is not None:
+            ax.set_yticks(np.asarray(row_grids) - .5, minor=True)
+        else:
+            ax.set_yticks(np.arange(num_data.shape[0] + 1) - .5, minor=True)
+
+        if col_grids is not None:
+            ax.set_xticks(np.asarray(col_grids) - .5, minor=True)
+        else:
+            ax.set_xticks(np.arange(num_data.shape[1] + 1) - .5, minor=True)
         ax.grid(which='minor',
                 linestyle='-',
                 color='w',
-                linewidth=1)
-        ax.tick_params(which='minor', bottom=False, left=False)
+                linewidth=2)
+        ax.tick_params(which='minor',
+                       bottom=False,
+                       left=False)
 
     return ax
 
@@ -1021,21 +1174,32 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
     :param df2: a dataFrame with genotype data, columns are a multiIndex with two levels (chrom, pos)
     :param cmap: colormap used in matplotlib, e.g., Oranges, Reds, viridis, PuRd, PuBu, PuBuGn, ...
     :param fig: figure object to plot on (default: None)
+    :return: a dictionary including all axes objects
     """
     # get figure object
     if fig is None:
         fig = plt.gcf()
 
     # create GridSpec with four axes
-    gs = fig.add_gridspec(4, 1, height_ratios=[1, 3, 1, 1], hspace=0.1)
-    ax1 = fig.add_subplot(gs[0])
-    ax2 = fig.add_subplot(gs[1])
-    ax3 = fig.add_subplot(gs[2])
-    ax4 = fig.add_subplot(gs[3])
+    gs = fig.add_gridspec(4, 1,
+                          height_ratios=(1, 3, .5, .5),
+                          hspace=0.1, wspace=0.02)
+    axs = {
+        'gene': fig.add_subplot(gs[0]),
+        'heatmap': fig.add_subplot(gs[1]),
+        'ref': fig.add_subplot(gs[2]),
+        'alt': fig.add_subplot(gs[3])
+    }
     # plot gene structure
-    cax = GeneStrucPlot(df1, ax=ax1)
+    cax = GeneStrucPlot(df1, ax=axs['gene'])
     # plot genotype heatmap
-    HeatmapPlot(df2.values, cmap=cmap, row_labels=df2.index.to_list(), plot_cbar=True, ax=ax2)
+    HeatmapPlot(
+        df2.values,
+        row_labels=df2.index.tolist(),
+        cmap=cmap,
+        plot_cbar=True,
+        ax=axs['heatmap'],
+        interpolation='none')
     # get ref and alt allele, e.g., A, T, G, C, AAAA, CCCC
     ref_allele = df2.columns.get_level_values(2)
     alt_allele = df2.columns.get_level_values(3)
@@ -1046,7 +1210,7 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
         cmap=cmap,
         ylabel='Ref allele',
         plot_grid=True,
-        ax=ax3
+        ax=axs['ref']
     )
     alt_allele_df = pd.Series(alt_allele).str.split('', expand=True).iloc[:, 1:-1].T
     HeatmapPlot(
@@ -1055,7 +1219,7 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
         cmap=cmap,
         ylabel="Alt allele",
         plot_grid=True,
-        ax=ax4
+        ax=axs['alt']
     )
     # connect two axes with connection patch
     # chromosome position must be int number
@@ -1065,7 +1229,7 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
     points2 = [(i, 1) for i in range(len(pos))]
 
     transA = transforms.blended_transform_factory(cax.transData, cax.transAxes)
-    transB = transforms.blended_transform_factory(ax2.transData, ax2.transAxes)
+    transB = transforms.blended_transform_factory(axs['heatmap'].transData, axs['heatmap'].transAxes)
     if len(points1) == len(points2):
         for i in range(len(points1)):
             fig.add_artist(
@@ -1090,7 +1254,7 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
                     coordsA=transA,
                     coordsB=transB,
                     axesA=cax,
-                    axesB=ax2,
+                    axesB=axs['heatmap'],
                     arrowstyle="-",
                     color="darkred",
                     linewidth=0.5,
@@ -1099,4 +1263,5 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
     else:
         raise ValueError('Length of points1 and points2 are not equal.')
 
-    return fig
+    return axs
+
