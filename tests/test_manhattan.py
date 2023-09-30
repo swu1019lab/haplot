@@ -14,7 +14,9 @@ np.random.seed(123)
 # generate random data for manhattan plot
 df = generate_data(sort=True, snp_num=1000, gene_num=2)
 # print(df)
-fig = plt.figure(figsize=(10, 5))
-ManhattanPlot(df, value_col=[2, 3], value_layout='stack', style='scatter', log=True)
-ManhattanTheme.apply()
+fig, ax = plt.subplots(figsize=(12, 4))
+axs = ManhattanPlot(df, value_col=[2, 3], value_layout='stack', style='scatter', log=True)
+for a in axs:
+    ManhattanTheme.apply(a)
+plt.tight_layout()
 plt.show()
