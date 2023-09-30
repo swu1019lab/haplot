@@ -21,3 +21,9 @@ haplot support python >= 3.10, with following packages installed:
 - geopandas >= 0.13.2
 - networkx >= 3.1
 
+## Installation
+```bash
+git clone https://github.com/swu1019lab/haplot.git
+cd haplot
+python setup.py install
+```
