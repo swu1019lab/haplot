@@ -127,16 +127,43 @@ class ManhattanTheme(object):
         return self.apply(*args, **kwargs)
 
     @staticmethod
-    def apply(ax: axes.Axes = None):
+    def apply(ax: axes.Axes = None,
+              title: str = None,
+              xlabel: str = None,
+              ylabel: str = None,
+              xspan: tuple = None,
+              yspan: tuple = None,
+              xticks: list = None,
+              xticks_label: list = None,
+              xticks_label_rotation: float = 0,
+              ):
         if ax is None:
             ax = plt.gca()
 
         Theme.apply(ax)
-        ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
+        if title is not None:
+            ax.set_title(title)
+        if xticks is not None and xticks_label is not None:
+            ax.set_xticks(xticks, xticks_label)
+
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        else:
+            ax.set_xlabel("Chromosome")
+
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+        else:
+            ax.set_ylabel(r"$\mathrm{-log}_{10}(\mathit{p})$")
+
+        if xspan is not None:
+            ax.axvspan(*xspan, facecolor='lightgray')
+        if yspan is not None:
+            ax.axhspan(*yspan, facecolor='lightgray')
+
         ax.set_xmargin(0.01)
         ax.set_ylim(bottom=0, top=None)
-        ax.set_xlabel("Chromosome")
-        ax.tick_params(axis='x', rotation=0)
+        ax.tick_params(axis='x', rotation=xticks_label_rotation)
         return ax
 
 
@@ -154,7 +181,7 @@ class QQTheme(object):
         if ax is None:
             ax = plt.gca()
         Theme.apply(ax)
-        ax.set_xlabel("Expected -log10(p-value)")
-        ax.set_ylabel("Observed -log10(p-value)")
+        ax.set_xlabel(r"Expected $\mathrm{-log}_{10}(\mathit{p})$")
+        ax.set_ylabel(r"Observed $\mathrm{-log}_{10}(\mathit{p})$")
         return ax
 
