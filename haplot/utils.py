@@ -7,6 +7,9 @@ from abc import ABC
 
 import numpy as np
 from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea
+from mpl_toolkits.axes_grid1.inset_locator import (
+    BboxPatch, BboxConnector, BboxConnectorPatch)
+from matplotlib.transforms import Bbox, TransformedBbox
 from matplotlib.lines import Line2D
 from matplotlib.text import Text
 
@@ -89,3 +92,65 @@ class AnchoredSizeLegend(AnchoredOffsetbox, ABC):
                      color='k', ha="left", va="center")
             )
         super().__init__(*args, child=self.box, **kwargs)
+
+
+def connect_bbox(ax1, ax2,
+                 x_min1, x_max1, x_min2, x_max2,
+                 plot_bbox1=True, plot_bbox2=True,
+                 loc1a=3, loc2a=2, loc1b=4, loc2b=1,
+                 prop_lines=None, prop_patches=None):
+    """
+    Connect two axes with bbox.
+
+    Parameters
+    ----------
+    :param ax1: an Axes object
+    :param ax2: an Axes object
+    :param x_min1: x min of ax1 with data coordinates
+    :param x_max1: x max of ax1 with data coordinates
+    :param x_min2: x min of ax2 with data coordinates
+    :param x_max2: x max of ax2 with data coordinates
+    :param plot_bbox1: whether to plot bbox1
+    :param plot_bbox2: whether to plot bbox2
+    :param loc1a: loc 1a of BboxConnector
+    :param loc2a: loc 2a of BboxConnector
+    :param loc1b: loc 1b of BboxConnector
+    :param loc2b: loc 2b of BboxConnector
+    :param prop_lines: properties of lines
+    :param prop_patches: properties of patches
+    :return: None
+    """
+    if prop_lines is None:
+        prop_lines = {
+            "color": "gray",
+        }
+
+    if prop_patches is None:
+        prop_patches = {
+            **prop_lines,
+            "alpha": prop_lines.get("alpha", 1) * 0.2,
+            "clip_on": False,
+        }
+
+    bbox1 = TransformedBbox(Bbox.from_extents(x_min1, 0, x_max1, 1), ax1.get_xaxis_transform())
+    bbox2 = TransformedBbox(Bbox.from_extents(x_min2, 0, x_max2, 1), ax2.get_xaxis_transform())
+    c1 = BboxConnector(
+        bbox1, bbox2, loc1=loc1a, loc2=loc2a, clip_on=False, **prop_lines)
+    c2 = BboxConnector(
+        bbox1, bbox2, loc1=loc1b, loc2=loc2b, clip_on=False, **prop_lines)
+
+    bbox_patch1 = BboxPatch(bbox1, **prop_patches)
+    bbox_patch2 = BboxPatch(bbox2, **prop_patches)
+
+    p = BboxConnectorPatch(bbox1, bbox2,
+                           loc1a=loc1a, loc2a=loc2a, loc1b=loc1b, loc2b=loc2b,
+                           **prop_patches)
+
+    if plot_bbox1:
+        ax1.add_patch(bbox_patch1)
+    if plot_bbox2:
+        ax2.add_patch(bbox_patch2)
+
+    ax2.add_patch(c1)
+    ax2.add_patch(c2)
+    ax2.add_patch(p)
