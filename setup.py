@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='haplot',
-    version='0.0.3',
+    version='0.0.4',
     description='A package for genomic data visualization',
     url='https://github.com/swu1019lab/haplot',
     author='XiaoDong Li',
