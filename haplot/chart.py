@@ -74,6 +74,7 @@ def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
 
     return ax
 
+
 def ScatterPlot(df: pd.DataFrame,
                 x_col: int = 0,
                 y_col: int = 1,
@@ -175,6 +176,7 @@ def ScatterPlot(df: pd.DataFrame,
         ax.set_title(title)
 
     return ax
+
 
 def ManhattanPlot(
         df: pd.DataFrame,
@@ -526,7 +528,7 @@ def GeoMapPlot(df: pd.DataFrame,
             theta = 2 * np.pi * np.linspace(value_percent[i, j - 1] if j > 0 else 0, value_percent[i, j], 100)
             vertices = np.column_stack([np.cos(theta), np.sin(theta)])
             ax.scatter(xy_data[i, 0], xy_data[i, 1],
-                       marker=np.append(vertices, [[0, 0]], axis=0),
+                       marker=np.append(vertices, np.asarray([[0, 0]]), axis=0),
                        s=value_sum[i], c=colors[j], linewidths=0)
 
     # add the legend for different values
@@ -707,8 +709,8 @@ def PiWithFstPlot(df: pd.DataFrame,
         legend_lines,
         [
             'Whole genome',
-            'Selected region (<{:.2f},>{:.2f})'.format(x_ci[0], y_ci[1]),
-            'Selected region (>{:.2f},>{:.2f})'.format(x_ci[1], y_ci[1])
+            'Selected region (pi<{:.2f} and Fst>{:.2f})'.format(x_ci[0], y_ci[1]),
+            'Selected region (pi>{:.2f} and Fst>{:.2f})'.format(x_ci[1], y_ci[1])
         ],
         loc='upper left', frameon=False
     )
@@ -981,7 +983,7 @@ def HapNetworkPlot(
                 ax.scatter(x, y,
                            np.sum(stat_data),
                            colors[i],
-                           marker=np.append(vertices, [[0, 0]], axis=0),
+                           marker=np.append(vertices, np.asarray([[0, 0]]), axis=0),
                            linewidths=0,
                            zorder=2)
 
@@ -1024,6 +1026,118 @@ def HapNetworkPlot(
     nx.draw_networkx_edges(T, pos, edge_color=[d["color"] for u, v, d in T.edges(data=True)])
 
     # hide axis
+    ax.set_axis_off()
+
+    return ax
+
+
+def VennNetworkPlot(
+        edge_data: pd.DataFrame,
+        edge_width: int | float = 1.0,
+        edge_style: int = 1,
+        source_node_size: int | float = 100,
+        source_font_size: int = 10,
+        target_node_size: int | float = 5,
+        target_font_size: int = 10,
+        show_node_margin: bool = True,
+        show_node_color: bool = False,
+        show_source_label: bool = True,
+        show_target_label: bool = False,
+        r: float = 0.5,
+        k: float = None,
+        ax: axes.Axes = None):
+    """
+    Plot venn network.
+
+    Parameters
+    ----------
+    :param edge_data: a dataFrame with three columns: source, target, color
+    :param edge_width: width of edges
+    :param edge_style: 1 for line, 2 for curve
+    :param source_node_size: size of source nodes
+    :param source_font_size: font size of source labels
+    :param target_node_size: size of target nodes
+    :param target_font_size: font size of target labels
+    :param show_node_margin: whether to show margin of nodes when style is curve
+    :param show_node_color: whether to show node color according to different source
+    :param show_source_label: whether to show source labels
+    :param show_target_label: whether to show target labels
+    :param r: radius of the fixed nodes based on circle center (0, 0)
+    :param k: optimal distance between nodes for spring layout
+    :param ax: axes object to plot on (default: None)
+    :return: axes object
+    """
+    # get axes object
+    if ax is None:
+        ax = plt.gca()
+
+    # create networkx graph
+    G = nx.from_pandas_edgelist(edge_data, edge_attr=['color'], create_using=nx.Graph())
+
+    # get fixed nodes from source column
+    fixed_nodes = edge_data['source'].unique()
+    print(fixed_nodes)
+    # set position of fixed nodes
+    fixed_nodes_pos = {node: (r * np.cos(2 * np.pi * i / len(fixed_nodes)),
+                              r * np.sin(2 * np.pi * i / len(fixed_nodes)))
+                       for i, node in enumerate(fixed_nodes)}
+
+    node_size = [target_node_size if u not in fixed_nodes else source_node_size for u, d in G.nodes(data=True)]
+    edge_color = [d["color"] for u, v, d in G.edges(data=True)]
+
+    node_options = {
+        "node_color": "lightgray",
+        "node_size": node_size,
+    }
+
+    edge_style1 = {
+        'edge_color': edge_color,
+        'width': edge_width,
+    }
+    edge_style2 = {
+        'edge_color': edge_color,
+        'width': edge_width,
+        'arrows': True,
+        'arrowsize': 10,
+        'arrowstyle': None,
+        'connectionstyle': 'arc3,rad=0.2'
+    }
+    edge_options = {
+        1: edge_style1,
+        2: edge_style2
+    }
+    # get node layout
+    pos = nx.spring_layout(G, pos=fixed_nodes_pos, fixed=fixed_nodes, seed=42, k=k)
+
+    # plot network
+    if show_node_color:
+        node_color = {}
+        node_color.update(dict(zip(edge_data['source'], edge_data['color'])))
+        node_color.update(dict(zip(edge_data['target'], edge_data['color'])))
+        node_options['node_color'] = [node_color[node] for node in G.nodes]
+    nx.draw_networkx_nodes(G, pos, **node_options)
+    nx.draw_networkx_edges(G, pos, **edge_options[edge_style])
+
+    if not show_node_margin:
+        for p in ax.patches:
+            p.shrinkA = p.shrinkB = 0.0
+
+    # show fixed nodes or source nodes with label
+    if show_source_label:
+        nx.draw_networkx_labels(G, pos,
+                                labels=dict(zip(fixed_nodes, fixed_nodes)),
+                                font_size=source_font_size,
+                                font_color='black',
+                                font_weight='bold',
+                                ax=ax)
+    # show target nodes with label
+    if show_target_label:
+        nx.draw_networkx_labels(G, pos,
+                                labels={node: node for node in G.nodes if node not in fixed_nodes},
+                                font_size=target_font_size,
+                                font_color='black',
+                                font_weight='bold',
+                                ax=ax)
     ax.set_axis_off()
 
     return ax
@@ -1264,4 +1378,3 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
         raise ValueError('Length of points1 and points2 are not equal.')
 
     return axs
-
