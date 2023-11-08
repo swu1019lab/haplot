@@ -14,6 +14,7 @@ from haplot.chart import PiWithFstPlot
 np.random.seed(20230719)
 x = np.random.randn(1000)
 y = np.random.randn(1000)
+y = (y - y.min()) / (y.max() - y.min())
 df = pd.DataFrame({'x': x, 'y': y})
 fig = plt.figure(figsize=(8, 8))
 PiWithFstPlot(df)
