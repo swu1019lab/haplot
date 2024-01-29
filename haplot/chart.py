@@ -23,7 +23,7 @@ import networkx as nx
 from haplot.utils import AnchoredSizeLegend
 
 
-def boxplot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
+def BoxPlot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
     """
     Boxplot
 
@@ -529,7 +529,7 @@ def GeoMapPlot(df: pd.DataFrame,
             vertices = np.column_stack([np.cos(theta), np.sin(theta)])
             ax.scatter(xy_data[i, 0], xy_data[i, 1],
                        marker=np.append(vertices, np.asarray([[0, 0]]), axis=0),
-                       s=value_sum[i], c=colors[j], linewidths=0)
+                       s=value_sum[i], c=colors[j], linewidths=0, zorder=3)
 
     # add the legend for different values
     legend = ax.legend(
@@ -1378,3 +1378,4 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
         raise ValueError('Length of points1 and points2 are not equal.')
 
     return axs
+
