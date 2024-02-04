@@ -20,8 +20,10 @@ import matplotlib.pyplot as plt
 
 import geopandas as gpd
 import networkx as nx
-from haplot.utils import AnchoredSizeLegend
+from haplot.utils import AnchoredSizeLegend, align_tip_labels
+from haplot.base import Gene
 
+from Bio import Phylo
 
 def BoxPlot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
     """
@@ -912,7 +914,6 @@ def GeneStrucPlot(
 
     return ax_twin
 
-
 def HapNetworkPlot(
         edge_data: pd.DataFrame,
         node_data: pd.DataFrame = None,
@@ -1314,7 +1315,7 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
         plot_cbar=True,
         ax=axs['heatmap'],
         interpolation='none')
-    # get ref and alt allele, e.g., A, T, G, C, AAAA, CCCC
+    # get ref and alt allele, e.g., A, T, G, C, AAAA, TTTT
     ref_allele = df2.columns.get_level_values(2)
     alt_allele = df2.columns.get_level_values(3)
     ref_allele_df = pd.Series(ref_allele).str.split('', expand=True).iloc[:, 1:-1].T
@@ -1377,5 +1378,47 @@ def GeneWithHapHeatmap(df1: pd.DataFrame,
     else:
         raise ValueError('Length of points1 and points2 are not equal.')
 
+    return axs
+
+
+def TreeWithGenePlot(tree, genes: pd.DataFrame, fig: plt.Figure = None):
+    """
+    Plot tree with gene structure.
+
+    Parameters
+    ----------
+    :param tree: a tree object returned by Phylo.read()
+    :param genes: a dataFrame with gene structure data
+    :param fig: figure object to plot on (default: None)
+    :return: a dictionary including all axes objects
+    """
+    # get figure object
+    if fig is None:
+        fig = plt.gcf()
+
+    # create GridSpec with two axes
+    gs = fig.add_gridspec(1, 2,
+                          width_ratios=(1, 2),
+                          wspace=0.02, hspace=0.02)
+    axs = {
+        'tree': fig.add_subplot(gs[0]),
+        'gene': fig.add_subplot(gs[1])
+    }
+
+    # align tip labels to the same x position (ignore real branch length)
+    align_tip_labels(tree)
+    # plot tree
+    Phylo.draw(tree, axes=axs['tree'], do_show=False)
+    axs['tree'].set_xlim(-0.1, 1.1)
+    axs['tree'].set_axis_off()
+
+    # plot gene structure
+    for i, gene in genes.reset_index(drop=True).iterrows():
+        gene = Gene(gene["id"], gene["chrom"], gene["start"], gene["end"], gene["strand"], gene["exons"])
+        gene.set_center(float(i) + 1)
+        gene.set_exons_height(0.2)
+        gene.set_exons_color('tab:purple')
+        gene.plot(axs['gene'], draw_label=False)
+    axs['gene'].set_ylim(axs['tree'].get_ylim())
     return axs
 
