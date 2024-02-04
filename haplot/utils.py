@@ -154,3 +154,23 @@ def connect_bbox(ax1, ax2,
     ax2.add_patch(c1)
     ax2.add_patch(c2)
     ax2.add_patch(p)
+
+def align_tip_labels(tree, max_width=1):
+    """
+    Align tip labels to the same x position.
+
+    Parameters
+    ----------
+    :param tree: a Phylo tree object
+    :param max_width: max width of the tree
+    :return: None
+    """
+    depths = tree.depths(unit_branch_lengths=True)
+    avg_width = max_width / max(depths.values())
+
+    # re-define the branch length of each clade to align the tip labels
+    for clade in tree.find_clades():
+        clade.branch_length = avg_width
+        if clade.is_terminal():
+            clade.branch_length += max_width - avg_width * depths[clade]
+    tree.root.branch_length = 0  # set the root branch length to 0
