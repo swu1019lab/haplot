@@ -15,7 +15,7 @@ class Gene(object):
     """
 
     def __init__(self, name: str, chrom: str, start: float, end: float, strand: str,
-                 exons_list: list = None, exons_color: str | list = 'C5', exons_shape: str | list = 'rect'):
+                 exons_data: str | list = None, exons_color: str | list = 'C5', exons_shape: str | list = 'rect'):
         """
         Init a gene object
 
@@ -24,10 +24,19 @@ class Gene(object):
         :param start: gene start position with bp unit
         :param end: gene end position with bp unit
         :param strand: gene strand, + or -
-        :param exons_list: exons list of gene, each exon contains start, end position
+        :param exons_data: exons list of gene, format: [[start1, end1], [start2, end2], ...] or
+        exons string of gene, format: "start1-end1,start2-end2,..."
         :param exons_color: exons color, default is 'C5'
         :param exons_shape: exons shape, default is 'rect', can be 'rect', 'circle', 'ellipse', 'polygon', etc.
         """
+        if isinstance(exons_data, str):
+            exons_list = [list(map(float, exon.split('-')))
+                          for exon in exons_data.replace(' ', '').split(',')]
+        elif isinstance(exons_data, list):
+            exons_list = exons_data
+        else:
+            raise ValueError("exons_data is none or not supported")
+
         self.name = name
         self.chrom = chrom
         self.start = start
@@ -54,13 +63,13 @@ class Gene(object):
                 'alpha': 1
             },
             'introns': {
-                'color': 'C0',
+                'color': 'teal',
                 'height': 0.01,
                 'zorder': 1,
                 'alpha': 1
             },
             'strand': {
-                'color': 'C0',
+                'color': 'teal',
                 'zorder': 1,
                 'alpha': 1
             },
@@ -312,7 +321,7 @@ class Gene(object):
                                              shrinkA=0, shrinkB=0))
 
     def plot(self, ax: axes.Axes, options: dict = None, draw_gene=False, draw_exons=True, draw_introns=True,
-             draw_strand=True):
+             draw_strand=True, draw_label=True):
         """
         Plot gene on ax
 
@@ -322,6 +331,7 @@ class Gene(object):
         :param draw_exons: whether plot exons
         :param draw_introns: whether plot introns
         :param draw_strand: whether plot strand
+        :param draw_label: whether plot label
         :return: None
         """
         if ax is None:
@@ -339,7 +349,8 @@ class Gene(object):
             self.draw_introns(ax, options)
         if draw_strand:
             self.draw_strand(ax, options)
-        self.draw_gene_label(ax, options)
+        if draw_label:
+            self.draw_gene_label(ax, options)
 
         # only keep bottom spine
         ax.spines[['left', 'top', 'right']].set_visible(False)
