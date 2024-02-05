@@ -1412,8 +1412,16 @@ def TreeWithGenePlot(tree, genes: pd.DataFrame, fig: plt.Figure = None):
     axs['tree'].set_xlim(-0.1, 1.1)
     axs['tree'].set_axis_off()
 
+    # select gene data for current tree and keep the order with tree tips
+    genes = genes.copy()
+    genes.columns = ['id', 'chrom', 'start', 'end', 'strand', 'exons']
+    genes.index = genes['id']
+    genes = genes.reindex([tip.name for tip in tree.get_terminals()]).reset_index(drop=True)
+    # check if gene data is valid
+    if genes.isna().sum().sum() > 0:
+        raise ValueError('Gene data is inconsistent with tip name in tree.')
     # plot gene structure
-    for i, gene in genes.reset_index(drop=True).iterrows():
+    for i, gene in genes.iterrows():
         gene = Gene(gene["id"], gene["chrom"], gene["start"], gene["end"], gene["strand"], gene["exons"])
         gene.set_center(float(i) + 1)
         gene.set_exons_height(0.2)
