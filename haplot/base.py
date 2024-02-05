@@ -35,7 +35,7 @@ class Gene(object):
         elif isinstance(exons_data, list):
             exons_list = exons_data
         else:
-            raise ValueError("exons_data is none or not supported")
+            raise ValueError("exons_data of gene ({}) is none or not supported".format(name))
 
         self.name = name
         self.chrom = chrom
