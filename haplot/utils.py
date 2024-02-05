@@ -155,7 +155,7 @@ def connect_bbox(ax1, ax2,
     ax2.add_patch(c2)
     ax2.add_patch(p)
 
-def align_tip_labels(tree, max_width=1):
+def align_tip_labels(tree, max_width=None):
     """
     Align tip labels to the same x position.
 
@@ -166,6 +166,8 @@ def align_tip_labels(tree, max_width=1):
     :return: None
     """
     depths = tree.depths(unit_branch_lengths=True)
+    if max_width is None:
+        max_width = max(depths.values())
     avg_width = max_width / max(depths.values())
 
     # re-define the branch length of each clade to align the tip labels
