@@ -1396,6 +1396,7 @@ def TreeWithGenePlot(tree, genes: pd.DataFrame, fig: plt.Figure = None):
     if fig is None:
         fig = plt.gcf()
 
+    fig.set_layout_engine(layout='constrained')
     # create GridSpec with two axes
     gs = fig.add_gridspec(1, 2,
                           width_ratios=(1, 2),
@@ -1406,7 +1407,7 @@ def TreeWithGenePlot(tree, genes: pd.DataFrame, fig: plt.Figure = None):
     }
 
     # align tip labels to the same x position (ignore real branch length)
-    align_tip_labels(tree)
+    align_tip_labels(tree, max_width=1)
     # plot tree
     Phylo.draw(tree, axes=axs['tree'], do_show=False)
     axs['tree'].set_xlim(-0.1, 1.1)
