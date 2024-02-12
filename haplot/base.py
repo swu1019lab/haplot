@@ -8,7 +8,6 @@
 import numpy as np
 from matplotlib import axes, patches
 
-
 class Gene(object):
     """
     Gene class for haplot
@@ -113,6 +112,18 @@ class Gene(object):
         """
         return self.exons
 
+    def reverse_strand(self):
+        """
+        Reverse the direction of strand (from 3'->5' to 5'->3') to get new position
+
+        :return: None
+        """
+        if self.strand == '-':
+            self.strand = '+'
+            self.exons = self.end - self.exons[::-1][:, ::-1]
+            self.exons += self.start
+            self.options['exons']['color'] = self.options['exons']['color'][::-1]
+
     def set_offset(self, offset):
         """
         Set offset of gene
@@ -198,11 +209,20 @@ class Gene(object):
         """
         self.options['introns']['color'] = color
 
+    def set_introns_height(self, height):
+        """
+        Set introns height
+
+        :param height: intron height within 0-1
+        :return: None
+        """
+        self.options['introns']['height'] = height
+
     def set_center(self, center: float):
         """
         Set center of gene
 
-        :param center: center value range from 0 to 1
+        :param center: center value in y-axis
         :return: None
         """
         self.options['center'] = center
@@ -320,8 +340,54 @@ class Gene(object):
                                              mutation_scale=10,
                                              shrinkA=0, shrinkB=0))
 
+    def draw_bezier_links(self, ax: axes.Axes, gene: 'Gene', color='grey'):
+        """
+        Draw links between two genes
+
+        :param ax: matplotlib ax object
+        :param gene: another gene object
+        :param color: link color
+        :return: None
+        """
+        xyA_from = (np.min(self.exons), self.options['center'])
+        xyA_to = (np.max(self.exons), self.options['center'])
+        xyB_from = (np.min(gene.exons), gene.options['center'])
+        xyB_to = (np.max(gene.exons), gene.options['center'])
+
+        # calculate the angle (in radians) of two genes
+        angleA = np.arctan2(xyA_to[1] - xyA_from[1], xyA_to[0] - xyA_from[0])
+        angleB = np.arctan2(xyB_to[1] - xyB_from[1], xyB_to[0] - xyB_from[0])
+
+        # calculate the center point of two genes
+        cenAB_from = [(xyA_from[0] + xyB_from[0]) / 2, (xyA_from[1] + xyB_from[1]) / 2]
+        cenAB_to = [(xyA_to[0] + xyB_to[0]) / 2, (xyA_to[1] + xyB_to[1]) / 2]
+
+        # calculate the control point of two genes
+        conA_from = [xyA_from[0] + np.tan(angleA) * (cenAB_from[1] - xyA_from[1]), cenAB_from[1]]
+        conB_from = [xyB_from[0] + np.tan(angleB) * (cenAB_from[1] - xyB_from[1]), cenAB_from[1]]
+
+        conA_to = [xyA_to[0] + np.tan(angleA) * (cenAB_to[1] - xyA_to[1]), cenAB_to[1]]
+        conB_to = [xyB_to[0] + np.tan(angleB) * (cenAB_to[1] - xyB_to[1]), cenAB_to[1]]
+
+        # draw Bézier curve
+        path_data = [
+            (patches.Path.MOVETO, xyA_from),
+            (patches.Path.CURVE4, conA_from),
+            (patches.Path.CURVE4, conB_from),
+            (patches.Path.CURVE4, xyB_from),
+            (patches.Path.LINETO, xyB_to),
+            (patches.Path.CURVE4, conB_to),
+            (patches.Path.CURVE4, conA_to),
+            (patches.Path.CURVE4, xyA_to),
+            (patches.Path.CLOSEPOLY, xyA_from)
+        ]
+        codes, vertices = zip(*path_data)
+        path = patches.Path(vertices, codes)
+        patch = patches.PathPatch(path, facecolor='lightgray', edgecolor=color, lw=1)
+        ax.add_patch(patch)
+
     def plot(self, ax: axes.Axes, options: dict = None, draw_gene=False, draw_exons=True, draw_introns=True,
-             draw_strand=True, draw_label=True):
+             draw_strand=True, draw_label=True, link_gene=None, link_color='grey'):
         """
         Plot gene on ax
 
@@ -332,6 +398,8 @@ class Gene(object):
         :param draw_introns: whether plot introns
         :param draw_strand: whether plot strand
         :param draw_label: whether plot label
+        :param link_gene: link gene with Bézier curve, should be a Gene object
+        :param link_color: link color
         :return: None
         """
         if ax is None:
@@ -351,6 +419,9 @@ class Gene(object):
             self.draw_strand(ax, options)
         if draw_label:
             self.draw_gene_label(ax, options)
+
+        if link_gene is not None:
+            self.draw_bezier_links(ax, link_gene, link_color)
 
         # only keep bottom spine
         ax.spines[['left', 'top', 'right']].set_visible(False)
