@@ -8,6 +8,7 @@
 import numpy as np
 from matplotlib import axes, patches
 
+
 class Gene(object):
     """
     Gene class for haplot
@@ -340,19 +341,36 @@ class Gene(object):
                                              mutation_scale=10,
                                              shrinkA=0, shrinkB=0))
 
-    def draw_bezier_links(self, ax: axes.Axes, gene: 'Gene', color='grey'):
+    def draw_bezier_links(self, ax: axes.Axes, gene: 'Gene', link_options: dict = None):
         """
         Draw links between two genes
 
         :param ax: matplotlib ax object
         :param gene: another gene object
-        :param color: link color
+        :param link_options: options dict for link
         :return: None
         """
-        xyA_from = (np.min(self.exons), self.options['center'])
-        xyA_to = (np.max(self.exons), self.options['center'])
-        xyB_from = (np.min(gene.exons), gene.options['center'])
-        xyB_to = (np.max(gene.exons), gene.options['center'])
+        _link_options = {
+            'color': 'grey',
+            'fc': 'lightgray',
+            'ec': 'grey',
+            'lw': 1,
+            'feature': 'exon'
+        }
+
+        if link_options is not None:
+            _link_options.update(link_options)
+
+        if _link_options['feature'] == 'exon':
+            xyA_from = (np.min(self.exons), self.options['center'])
+            xyA_to = (np.max(self.exons), self.options['center'])
+            xyB_from = (np.min(gene.exons), gene.options['center'])
+            xyB_to = (np.max(gene.exons), gene.options['center'])
+        else:
+            xyA_from = (self.start, self.options['center'])
+            xyA_to = (self.end, self.options['center'])
+            xyB_from = (gene.start, gene.options['center'])
+            xyB_to = (gene.end, gene.options['center'])
 
         # calculate the angle (in radians) of two genes
         angleA = np.arctan2(xyA_to[1] - xyA_from[1], xyA_to[0] - xyA_from[0])
@@ -383,11 +401,12 @@ class Gene(object):
         ]
         codes, vertices = zip(*path_data)
         path = patches.Path(vertices, codes)
-        patch = patches.PathPatch(path, facecolor='lightgray', edgecolor=color, lw=1)
+        patch = patches.PathPatch(path, facecolor=_link_options['fc'], edgecolor=_link_options['ec'],
+                                  lw=_link_options['lw'])
         ax.add_patch(patch)
 
     def plot(self, ax: axes.Axes, options: dict = None, draw_gene=False, draw_exons=True, draw_introns=True,
-             draw_strand=True, draw_label=True, link_gene=None, link_color='grey'):
+             draw_strand=True, draw_label=True, link_gene=None, link_options=None):
         """
         Plot gene on ax
 
@@ -399,7 +418,7 @@ class Gene(object):
         :param draw_strand: whether plot strand
         :param draw_label: whether plot label
         :param link_gene: link gene with Bézier curve, should be a Gene object
-        :param link_color: link color
+        :param link_options: options dict for link
         :return: None
         """
         if ax is None:
@@ -419,9 +438,8 @@ class Gene(object):
             self.draw_strand(ax, options)
         if draw_label:
             self.draw_gene_label(ax, options)
-
         if link_gene is not None:
-            self.draw_bezier_links(ax, link_gene, link_color)
+            self.draw_bezier_links(ax, link_gene, link_options)
 
         # only keep bottom spine
         ax.spines[['left', 'top', 'right']].set_visible(False)
