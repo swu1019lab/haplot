@@ -52,25 +52,25 @@ class Gene(object):
             'gene': {
                 'color': 'red',
                 'height': 0.10,
-                'zorder': 3,
+                'zorder': 4,
                 'alpha': 1
             },
             'exons': {
                 'color': [],
                 'shape': [],
                 'height': 0.10,
-                'zorder': 2,
+                'zorder': 3,
                 'alpha': 1
             },
             'introns': {
                 'color': 'teal',
                 'height': 0.01,
-                'zorder': 1,
+                'zorder': 2,
                 'alpha': 1
             },
             'strand': {
                 'color': 'teal',
-                'zorder': 1,
+                'zorder': 2,
                 'alpha': 1
             },
         }
@@ -350,27 +350,30 @@ class Gene(object):
         :param link_options: options dict for link
         :return: None
         """
-        _link_options = {
+        _options = {
             'color': 'grey',
             'fc': 'lightgray',
             'ec': 'grey',
             'lw': 1,
+            'zorder': 1,
             'feature': 'exon'
         }
 
         if link_options is not None:
-            _link_options.update(link_options)
+            _options.update(link_options)
 
-        if _link_options['feature'] == 'exon':
+        if _options['feature'] == 'exon':
             xyA_from = (np.min(self.exons), self.options['center'])
             xyA_to = (np.max(self.exons), self.options['center'])
             xyB_from = (np.min(gene.exons), gene.options['center'])
             xyB_to = (np.max(gene.exons), gene.options['center'])
-        else:
+        elif _options['feature'] == 'gene':
             xyA_from = (self.start, self.options['center'])
             xyA_to = (self.end, self.options['center'])
             xyB_from = (gene.start, gene.options['center'])
             xyB_to = (gene.end, gene.options['center'])
+        else:
+            raise ValueError("feature {} is not supported".format(_options['feature']))
 
         # calculate the angle (in radians) of two genes
         angleA = np.arctan2(xyA_to[1] - xyA_from[1], xyA_to[0] - xyA_from[0])
@@ -401,8 +404,8 @@ class Gene(object):
         ]
         codes, vertices = zip(*path_data)
         path = patches.Path(vertices, codes)
-        patch = patches.PathPatch(path, facecolor=_link_options['fc'], edgecolor=_link_options['ec'],
-                                  lw=_link_options['lw'])
+        patch = patches.PathPatch(path, facecolor=_options['fc'], edgecolor=_options['ec'],
+                                  lw=_options['lw'], zorder=_options['zorder'])
         ax.add_patch(patch)
 
     def plot(self, ax: axes.Axes, options: dict = None, draw_gene=False, draw_exons=True, draw_introns=True,
