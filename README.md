@@ -25,5 +25,6 @@ haplot support python >= 3.10, with following packages installed:
 ```bash
 git clone https://github.com/swu1019lab/haplot.git
 cd haplot
+# recommended to install the package after installing the dependencies with pip mirror
 python setup.py install
 ```
