@@ -395,11 +395,12 @@ class Gene(object):
             ax.arrow(p[2], (y0 + y1) / 2, -p[3], 0, color=_options['color'], zorder=_options['zorder'],
                         alpha=_options['alpha'], head_width=0.02, head_length=10, shape='right')
             # draw line between forward and reverse primer
-            ax.plot([p[0], p[2]], [(y0 + y1) / 2, (y0 + y1) / 2], color='gray', linestyle='--')
+            ax.plot([p[0], p[2]], [(y0 + y1) / 2, (y0 + y1) / 2], color='gray', linestyle='--', linewidth=1)
             # annotation number between forward and reverse primer
-            ax.annotate(str(i + 1), xy=((p[0] + p[2]) / 2, y0), xycoords='data',
-                        xytext=(0, 5), textcoords="offset points",
-                        color='black', fontsize=10, ha='center', va='bottom')
+            bbox = dict(boxstyle="Circle, pad=0.1", fc=mpl.colormaps['summer'](i), ec='none', alpha=0.8)
+            ax.annotate(str(i), xy=((p[0] + p[2]) / 2, y0), xycoords='data',
+                        xytext=(0, 10), textcoords="offset points", bbox=bbox,
+                        color='white', fontsize=10, ha='center', va='bottom')
             # update y0 and y1
             y0 += _options['height'] + _options['padding']
             y1 += _options['height'] + _options['padding']
@@ -577,20 +578,12 @@ class Gene(object):
         xyB_from = (gene.start, yB)
         xyB_to = (gene.end, yB)
 
-        # calculate the angle (in radians) of two genes
-        angleA = np.arctan2(xyA_to[1] - xyA_from[1], xyA_to[0] - xyA_from[0])
-        angleB = np.arctan2(xyB_to[1] - xyB_from[1], xyB_to[0] - xyB_from[0])
-
-        # calculate the center point of two genes
-        cenAB_from = [(xyA_from[0] + xyB_from[0]) / 2, (xyA_from[1] + xyB_from[1]) / 2]
-        cenAB_to = [(xyA_to[0] + xyB_to[0]) / 2, (xyA_to[1] + xyB_to[1]) / 2]
-
         # calculate the control point of two genes
-        conA_from = [xyA_from[0] + np.tan(angleA) * (cenAB_from[1] - xyA_from[1]), cenAB_from[1]]
-        conB_from = [xyB_from[0] + np.tan(angleB) * (cenAB_from[1] - xyB_from[1]), cenAB_from[1]]
+        conA_from = [xyA_from[0], (yA + yB) / 2]
+        conB_from = [xyB_from[0], (yA + yB) / 2]
 
-        conA_to = [xyA_to[0] + np.tan(angleA) * (cenAB_to[1] - xyA_to[1]), cenAB_to[1]]
-        conB_to = [xyB_to[0] + np.tan(angleB) * (cenAB_to[1] - xyB_to[1]), cenAB_to[1]]
+        conA_to = [xyA_to[0], (yA + yB) / 2]
+        conB_to = [xyB_to[0], (yA + yB) / 2]
 
         # draw Bézier curve
         path_data = [
@@ -889,7 +882,7 @@ class Heatmap(object):
         ax.imshow(self.data, aspect='auto', cmap=self.cmap, norm=self.norm)
 
     def plot(self, ax: axes.Axes, draw_cbar=True, draw_grid=True,
-             draw_row_labels=True, draw_col_labels=True, draw_tree=False, draw_text=True):
+             draw_row_labels=True, draw_col_labels=True, draw_text=True):
         """
         Plot heatmap on ax
 
@@ -898,7 +891,6 @@ class Heatmap(object):
         :param draw_grid: whether draw grid
         :param draw_row_labels: whether draw row labels
         :param draw_col_labels: whether draw column labels
-        :param draw_tree: whether draw tree
         :param draw_text: whether draw text
         """
         if ax is None:
@@ -909,9 +901,7 @@ class Heatmap(object):
             self.draw_cbar(ax)
         if draw_grid:
             self.draw_grid(ax)
-        if draw_row_labels and draw_tree:
-            self.draw_row_labels(ax, labels_as_color=True, show_labels=False, show_ticks=False)
-        else:
+        if draw_row_labels:
             self.draw_row_labels(ax, labels_as_color=True)
         if draw_col_labels:
             self.draw_col_labels(ax, labels_as_color=True)
