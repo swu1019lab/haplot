@@ -16,6 +16,7 @@ setup(
         'scipy>=1.9.3',
         'geopandas>=0.13.2',
         'networkx>=3.1',
+        'biopython>=1.83',
     ],
     zip_safe=False,
     python_requires='>=3.10'
