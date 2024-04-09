@@ -25,6 +25,7 @@ from haplot.base import Gene
 
 from Bio import Phylo
 
+
 def BoxPlot(df: pd.DataFrame, by: str = 'column', ax: axes.Axes = None):
     """
     Boxplot
@@ -656,6 +657,9 @@ def HistPlot(df: pd.DataFrame,
 def PiWithFstPlot(df: pd.DataFrame,
                   pi_ratio_col: int = 0,
                   fst_col: int = 1,
+                  export_data: bool = True,
+                  x_label: str = 'Pi ratio',
+                  y_label: str = 'Fst',
                   fig: figure.Figure = None):
     """
     Pi ratio with Fst plot
@@ -665,6 +669,9 @@ def PiWithFstPlot(df: pd.DataFrame,
     :param df: a dataframe with at least two columns: 'fst' and 'pi ratio'
     :param pi_ratio_col: column index of pi ratio value
     :param fst_col: column index of fst value
+    :param export_data: whether to export the plot data to a file
+    :param x_label: label of x-axis
+    :param y_label: label of y-axis
     :param fig: matplotlib figure object
     :return: matplotlib figure object
     """
@@ -683,6 +690,12 @@ def PiWithFstPlot(df: pd.DataFrame,
     data = np.column_stack((xdata, ydata))
     data_top0 = data[np.all([data[:, 0] < x_ci[0], data[:, 1] > y_ci[1]], axis=0)]
     data_top1 = data[np.all([data[:, 0] > x_ci[1], data[:, 1] > y_ci[1]], axis=0)]
+
+    if export_data:
+        pd.DataFrame(data_top0, columns=[x_label, y_label]).to_csv(
+            'data.pi_ratio{:.2f}.fst{:.2f}.csv'.format(x_ci[0], y_ci[1]), index=False)
+        pd.DataFrame(data_top1, columns=[x_label, y_label]).to_csv(
+            'data.pi_ratio{:.2f}.fst{:.2f}.csv'.format(x_ci[1], y_ci[1]), index=False)
 
     # get figure object
     if fig is None:
@@ -716,8 +729,8 @@ def PiWithFstPlot(df: pd.DataFrame,
         ],
         loc='upper left', frameon=False
     )
-    ax.set_xlabel('Log10(Pi ratio)')
-    ax.set_ylabel('Fst')
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
     ax.axvline(x=x_ci[0], c='C7', linewidth=1, linestyle='--')
     ax.axvline(x=x_ci[1], c='C7', linewidth=1, linestyle='--')
     ax.axhline(y=y_ci[0], c='C7', linewidth=1, linestyle='--')
@@ -913,6 +926,7 @@ def GeneStrucPlot(
     ax_twin.set_axisbelow(True)
 
     return ax_twin
+
 
 def HapNetworkPlot(
         edge_data: pd.DataFrame,
@@ -1431,3 +1445,84 @@ def TreeWithGenePlot(tree, genes: pd.DataFrame, fig: plt.Figure = None):
     axs['gene'].set_ylim(axs['tree'].get_ylim())
     return axs
 
+
+def GOEnrichmentPlot(df: pd.DataFrame,
+                     name_col: int = 3,
+                     p_col: int = 9,
+                     sort_p: bool = False,
+                     ns: str = 'BP',
+                     cmap: str = 'coolwarm',
+                     title: str = None,
+                     top_n: int = 10,
+                     draw_bar: bool = True,
+                     draw_bubble: bool = False,
+                     ax: axes.Axes = None):
+    """
+    Plot GO enrichment result.
+
+    Parameters
+    ----------
+    :param df: a dataFrame with GO enrichment result
+    :param name_col: column index of GO term name
+    :param p_col: column index of p-value
+    :param sort_p: whether to sort data by p-value
+    :param ns: namespace of GO term, e.g., BP, MF, CC
+    :param cmap: colormap used in matplotlib, e.g., Oranges, Reds, viridis, PuRd, PuBu, PuBuGn, ...
+    :param title: title of plot
+    :param top_n: top n GO terms to show
+    :param draw_bar: whether to draw bar plot
+    :param draw_bubble: whether to draw bubble plot
+    :param ax: axes object to plot on (default: None)
+    """
+    # get axes object
+    if ax is None:
+        ax = plt.gca()
+
+    df = df.copy()
+    # subset data by namespace
+    df = df[df['NS'] == ns]
+    # add the column of rich factor
+    rich_factor = df['study_count'].astype('int32') / df['ratio_in_pop'].str.split('/').str[
+        0].astype('int32')
+    df = df.assign(rich_factor=rich_factor)
+    # sort data by p-value
+    if sort_p:
+        df = df.sort_values(by=df.columns[p_col])
+    # select top n GO terms
+    df = df.head(top_n)
+    if draw_bar:
+        draw_bubble = False
+        # plot bar
+        ax.barh(df.iloc[:, name_col], df.iloc[:, -1], color=mpl.cm.get_cmap(cmap)(df.iloc[:, p_col]))
+        # add count as text
+        for i, count in enumerate(df['study_count']):
+            ax.text(df.iloc[i, -1], i, '{}'.format(count), ha='left', va='center')
+    if draw_bubble:
+        # plot bubble
+        scatter = ax.scatter(df.iloc[:, -1], df.iloc[:, name_col], s=df['study_count'], c=df.iloc[:, p_col], cmap=cmap)
+        # add legend for bubble size
+        handles, labels = scatter.legend_elements(prop="sizes", alpha=0.6, num=4)
+        ax.legend(handles, labels, title="Sizes", loc="upper right")
+
+    # add title
+    if title is None:
+        title = 'Top {} GO terms in {}'.format(top_n, ns)
+        ax.set_title(title)
+    # increase spines line width
+    ax.spines[:].set_linewidth(1.2)
+    # add grid
+    ax.grid(axis='both', linestyle='--', color='lightgrey', alpha=.5)
+    # set x, y label
+    ax.set_xlabel('rich factor')
+    ax.set_ylabel('GO term')
+    # add color bar
+    sm = mpl.cm.ScalarMappable(cmap=cmap)
+    sm.set_array(df.iloc[:, p_col])
+    cbar = plt.colorbar(sm, ax=ax, orientation='vertical', anchor=(0, 0.4), shrink=0.6)
+    cbar.set_label('P-value')
+
+    return ax
+
+
+def CafeTreePlot():
+    pass
