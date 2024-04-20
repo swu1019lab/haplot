@@ -1,4 +1,5 @@
 # haplot
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.11001623-blue)](https://doi.org/10.5281/zenodo.11001623)
 
 A set of easy-to-use plot functions can be used for genomic visual analysis
 
